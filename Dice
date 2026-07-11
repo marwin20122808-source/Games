@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dice - Stake Clone</title>
+    <style>
+        :root {
+            --bg-main: #1a2c38;
+            --bg-panel: #0f212e;
+            --bg-tile: #2f4553;
+            --bg-tile-hover: #557086;
+            --text-main: #ffffff;
+            --text-muted: #b1bad3;
+            --color-green: #00e701;
+            --color-green-hover: #1fff22;
+            --color-red: #ed4163;
+            --border-input: #213743;
+            --bg-input: #1a2c38;
+            --track-height: 14px;
+            --thumb-size: 28px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--bg-panel);
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        .logo span { color: var(--color-green); }
+
+        .balance-container {
+            background-color: var(--bg-panel);
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid var(--border-input);
+        }
+
+        .balance-label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+        .balance-amount { color: var(--text-main); font-size: 18px; transition: color 0.2s; }
+
+        /* Game Layout */
+        .game-container {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+            background-color: var(--bg-panel);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* Left Side: Controls */
+        .control-panel {
+            width: 320px;
+            background-color: var(--bg-panel);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 2px solid var(--bg-main);
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        .input-label { color: var(--text-muted); font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        
+        .input-wrapper input {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 2px solid var(--border-input);
+            border-radius: 4px;
+            padding: 12px;
+            color: var(--text-main);
+            font-size: 15px;
+            font-weight: bold;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-wrapper input:focus { border-color: var(--text-muted); }
+        .currency-symbol { position: absolute; right: 12px; color: var(--text-muted); font-weight: bold; }
+
+        .btn-action {
+            background-color: var(--color-green);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-action:hover { background-color: var(--color-green-hover); }
+        .btn-action:active { transform: scale(0.98); }
+
+        /* Right Side: Board Panel */
+        .board-panel {
+            flex: 1;
+            background-color: var(--bg-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        /* Center Result Banner */
+        .result-banner {
+            position: absolute;
+            top: 40px;
+            font-size: 54px;
+            font-weight: 800;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(-20px);
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            letter-spacing: -1px;
+        }
+
+        .result-banner.show { opacity: 1; transform: translateY(0); }
+        .win-text { color: var(--color-green); }
+        .loss-text { color: var(--color-red); }
+
+        /* Slider Area */
+        .slider-container {
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+            margin-top: 60px;
+            margin-bottom: 50px;
+            padding: 20px 0;
+        }
+
+        /* Number Track Labels (0, 25, 50, 75, 100) */
+        .track-marks {
+            position: absolute;
+            bottom: -10px;
+            width: calc(100% - var(--thumb-size));
+            left: calc(var(--thumb-size) / 2);
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .track-marks span {
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 700;
+            position: relative;
+            transform: translateX(-50%);
+        }
+        
+        .track-marks span::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            width: 2px;
+            height: 6px;
+            background-color: var(--bg-tile-hover);
+            transform: translateX(-50%);
+            border-radius: 2px;
+        }
+
+        /* Floating Bubble that tracks the thumb */
+        .thumb-bubble {
+            position: absolute;
+            top: -15px;
+            background: var(--bg-tile);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            transform: translateX(-50%);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 10;
+            transition: left 0.05s;
+        }
+
+        .thumb-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px 5px 0;
+            border-style: solid;
+            border-color: var(--bg-tile) transparent transparent transparent;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: var(--track-height);
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: var(--thumb-size);
+            width: var(--thumb-size);
+            border-radius: 50%;
+            background: #ffffff;
+            cursor: grab;
+            margin-top: calc((var(--track-height) - var(--thumb-size)) / 2);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 6px solid var(--bg-tile);
+            transition: transform 0.1s, border-color 0.2s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover { border-color: var(--bg-tile-hover); }
+        input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.15); border-color: #ffffff; }
+
+        #dice-slider { background: linear-gradient(to right, var(--color-red) 50%, var(--color-green) 50%); }
+
+        /* Roll Result Marker & Bubble */
+        .roll-marker-wrapper {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 15;
+            pointer-events: none;
+            opacity: 0;
+            transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.2s;
+        }
+
+        .roll-marker-dot {
+            width: 20px;
+            height: 20px;
+            background-color: #ffffff;
+            border: 4px solid #000;
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(255,255,255,0.6);
+            margin: 0 auto;
+        }
+
+        .roll-marker-bubble {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-green);
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 900;
+            white-space: nowrap;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .roll-marker-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: var(--color-green) transparent transparent transparent;
+        }
+
+        .roll-loss .roll-marker-dot { border-color: var(--color-red); }
+        .roll-loss .roll-marker-bubble { background: var(--color-red); color: #fff; }
+        .roll-loss .roll-marker-bubble::after { border-color: var(--color-red) transparent transparent transparent; }
+
+        .roll-win .roll-marker-dot { border-color: var(--color-green); }
+        .roll-win .roll-marker-bubble { background: var(--color-green); color: #000; }
+        .roll-win .roll-marker-bubble::after { border-color: var(--color-green) transparent transparent transparent; }
+
+        /* Stats Blocks Below Slider */
+        .dice-stats {
+            display: flex;
+            width: 100%;
+            max-width: 600px;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background-color: var(--bg-panel);
+            padding: 15px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border: 1px solid var(--border-input);
+        }
+
+        .stat-box label { color: var(--text-muted); font-size: 13px; font-weight: bold; }
+        .stat-box input {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 18px;
+            font-weight: bold;
+            outline: none;
+            width: 100%;
+        }
+
+        .flip-btn {
+            background-color: var(--bg-tile);
+            border: none;
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .flip-btn:hover { background-color: var(--bg-tile-hover); }
+
+        @media (max-width: 800px) {
+            .game-container { flex-direction: column; }
+            .control-panel { width: 100%; border-right: none; border-bottom: 2px solid var(--bg-main); }
+            .dice-stats { flex-wrap: wrap; }
+            .stat-box { min-width: 45%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">STAKE<span>DICE</span></div>
+        <div class="balance-container">
+            <span class="balance-label">Balance</span>
+            <span class="balance-amount" id="balance-display">$1,000.00</span>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <!-- Left Control Panel -->
+        <div class="control-panel">
+            <div class="input-group">
+                <label class="input-label" for="bet-amount">
+                    <span>Bet Amount</span>
+                    <span id="payout-label" style="color: var(--color-green);">$0.00</span>
+                </label>
+                <div class="input-wrapper">
+                    <input type="number" id="bet-amount" value="10.00" min="0.01" step="1.00">
+                    <span class="currency-symbol">USD</span>
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-top: 10px;">
+                <label class="input-label">Profit on Win</label>
+                <div class="input-wrapper">
+                    <input type="text" id="profit-display" value="$10.00" disabled style="color: var(--color-green);">
+                </div>
+            </div>
+
+            <button class="btn-action" id="bet-btn">Bet</button>
+        </div>
+
+        <!-- Right Game Board -->
+        <div class="board-panel">
+            
+            <div class="result-banner" id="result-banner">50.00</div>
+
+            <div class="slider-container">
+                <!-- Floating Thumb Target Indicator -->
+                <div class="thumb-bubble" id="thumb-bubble">50.00</div>
+
+                <input type="range" id="dice-slider" min="2.00" max="98.00" step="0.01" value="50.00">
+                
+                <!-- Track Scale Markings -->
+                <div class="track-marks">
+                    <span style="left: 0%;">0</span>
+                    <span style="left: 25%;">25</span>
+                    <span style="left: 50%;">50</span>
+                    <span style="left: 75%;">75</span>
+                    <span style="left: 100%;">100</span>
+                </div>
+
+                <!-- Animated Result Dice Moving across the track -->
+                <div class="roll-marker-wrapper" id="roll-marker-wrapper">
+                    <div class="roll-marker-bubble" id="roll-marker-bubble">50.00</div>
+                    <div class="roll-marker-dot"></div>
+                </div>
+            </div>
+
+            <div class="dice-stats">
+                <div class="stat-box">
+                    <label>Multiplier</label>
+                    <input type="number" id="input-multiplier" step="0.01">
+                </div>
+                
+                <div class="stat-box" style="flex: 0.5; align-items: center; justify-content: center; background: transparent; border: none; padding: 0;">
+                    <button class="flip-btn" id="flip-btn">Roll Over ↺</button>
+                </div>
+
+                <div class="stat-box">
+                    <label id="target-label">Roll Over</label>
+                    <input type="number" id="input-target" step="0.01">
+                </div>
+                <div class="stat-box">
+                    <label>Win Chance (%)</label>
+                    <input type="number" id="input-chance" step="0.01">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // State Variables
+        let balance = 1000.00;
+        let isRollOver = true; // True = Target and above wins
+        const HOUSE_EDGE = 1;  // 1%
+        const RTP = 100 - HOUSE_EDGE; // 99
+
+        // Core DOM Elements
+        const balanceDisplay = document.getElementById('balance-display');
+        const betInput = document.getElementById('bet-amount');
+        const profitDisplay = document.getElementById('profit-display');
+        const payoutLabel = document.getElementById('payout-label');
+        const betBtn = document.getElementById('bet-btn');
+        const slider = document.getElementById('dice-slider');
+        const thumbBubble = document.getElementById('thumb-bubble');
+        
+        const inputMultiplier = document.getElementById('input-multiplier');
+        const inputTarget = document.getElementById('input-target');
+        const inputChance = document.getElementById('input-chance');
+        const flipBtn = document.getElementById('flip-btn');
+        const targetLabel = document.getElementById('target-label');
+        
+        const rollMarkerWrapper = document.getElementById('roll-marker-wrapper');
+        const rollMarkerBubble = document.getElementById('roll-marker-bubble');
+        const resultBanner = document.getElementById('result-banner');
+
+        // Audio Engine
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                if (type === 'win') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+                } else if (type === 'loss') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+                }
+                osc.connect(gain); gain.connect(audioCtx.destination);
+            } catch(e) {}
+        }
+
+        // Complex position calculation to perfectly align HTML overlays with the center of the native Range Slider Thumb
+        function getThumbPosition(val) {
+            const min = parseFloat(slider.min);
+            const max = parseFloat(slider.max);
+            const percent = (val - min) / (max - min);
+            
+            // Thumb size correction factor (aligns center of custom div with center of native thumb)
+            const thumbOffset = 28; // width of thumb
+            const thumbCorrection = (thumbOffset / 2) - (percent * thumbOffset);
+            return `calc(${percent * 100}% + ${thumbCorrection}px)`;
+        }
+
+        // Math & Logic
+        function calculateFromTarget(targetVal) {
+            let winChance = isRollOver ? (100.00 - targetVal) : targetVal;
+            if (winChance < 0.01) winChance = 0.01;
+            if (winChance > 98.00) winChance = 98.00;
+            return { chance: winChance.toFixed(2), multiplier: (RTP / winChance).toFixed(4) };
+        }
+
+        function calculateFromMultiplier(multVal) {
+            let winChance = RTP / multVal;
+            if (winChance > 98.00) winChance = 98.00;
+            if (winChance < 0.01) winChance = 0.01;
+            let target = isRollOver ? (100.00 - winChance) : winChance;
+            return { chance: winChance.toFixed(2), target: target.toFixed(2) };
+        }
+
+        function updateUI(source = 'slider') {
+            let targetVal = parseFloat(slider.value);
+            
+            if (source === 'multiplier') {
+                let m = parseFloat(inputMultiplier.value);
+                if (m < 1.0102) m = 1.0102; 
+                if (m > 9900) m = 9900;     
+                const calcs = calculateFromMultiplier(m);
+                slider.value = calcs.target;
+                inputTarget.value = calcs.target;
+                inputChance.value = calcs.chance;
+            } 
+            else if (source === 'chance') {
+                let c = parseFloat(inputChance.value);
+                if (c > 98.00) c = 98.00;
+                if (c < 0.01) c = 0.01;
+                let t = isRollOver ? (100 - c) : c;
+                slider.value = t.toFixed(2);
+                inputTarget.value = t.toFixed(2);
+                inputMultiplier.value = (RTP / c).toFixed(4);
+            }
+            else { 
+                if (source === 'target') {
+                    let t = parseFloat(inputTarget.value);
+                    if (t < 2.00) t = 2.00;
+                    if (t > 98.00) t = 98.00;
+                    slider.value = t.toFixed(2);
+                }
+                const calcs = calculateFromTarget(parseFloat(slider.value));
+                inputTarget.value = slider.value;
+                inputMultiplier.value = calcs.multiplier;
+                inputChance.value = calcs.chance;
+            }
+
+            // Sync Thumb Target Bubble position & text
+            const currentVal = slider.value;
+            thumbBubble.textContent = currentVal;
+            thumbBubble.style.left = getThumbPosition(currentVal);
+
+            // Dynamically paint the track red/green behind the thumb
+            const percent = (currentVal - 2) / (98 - 2) * 100; // Normalizing 2-98 range for CSS background
+            const bg = isRollOver 
+                ? `linear-gradient(to right, var(--color-red) ${percent}%, var(--color-green) ${percent}%)`
+                : `linear-gradient(to right, var(--color-green) ${percent}%, var(--color-red) ${percent}%)`;
+            
+            slider.style.background = bg;
+            updateProfit();
+        }
+
+        function updateProfit() {
+            const bet = parseFloat(betInput.value) || 0;
+            const mult = parseFloat(inputMultiplier.value) || 0;
+            profitDisplay.value = '$' + ((bet * mult) - bet).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+            payoutLabel.textContent = '$' + (bet * mult).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+
+        function flashBalance(color) {
+            balanceDisplay.style.color = color;
+            setTimeout(() => { balanceDisplay.style.color = "var(--text-main)"; }, 300);
+        }
+        function formatMoney(amount) { return '$' + amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,'); }
+
+        // --- GAME LOGIC ---
+        function rollDice() {
+            const betValue = parseFloat(betInput.value);
+            if (isNaN(betValue) || betValue <= 0) return alert("Enter a valid bet.");
+            if (betValue > balance) return alert("Insufficient balance.");
+
+            // Deduct
+            balance -= betValue;
+            balanceDisplay.textContent = formatMoney(balance);
+
+            // Generate Result (0.00 to 100.00)
+            const roll = (Math.random() * 100);
+            const rollStr = roll.toFixed(2);
+            const rollNum = parseFloat(rollStr);
+            const target = parseFloat(slider.value);
+
+            let isWin = isRollOver ? (rollNum >= target) : (rollNum <= target);
+
+            // Animate moving result dice bubble
+            rollMarkerWrapper.style.opacity = 1;
+            
+            // Since the track min is 2 and max is 98, we need to artificially position rolls < 2 or > 98 at the very edges safely
+            let visualPos = rollNum;
+            if(visualPos < 2) visualPos = 2; 
+            if(visualPos > 98) visualPos = 98;
+            
+            rollMarkerWrapper.style.left = getThumbPosition(visualPos);
+            rollMarkerBubble.textContent = rollStr;
+
+            // Apply Win/Loss styles to the moving bubble marker
+            if (isWin) {
+                rollMarkerWrapper.className = 'roll-marker-wrapper roll-win';
+                resultBanner.className = 'result-banner show win-text';
+            } else {
+                rollMarkerWrapper.className = 'roll-marker-wrapper roll-loss';
+                resultBanner.className = 'result-banner show loss-text';
+            }
+
+            resultBanner.textContent = rollStr;
+
+            // Process Win
+            if (isWin) {
+                const payout = betValue * parseFloat(inputMultiplier.value);
+                balance += payout;
+                balanceDisplay.textContent = formatMoney(balance);
+                flashBalance("var(--color-green)");
+                playSound('win');
+            } else {
+                flashBalance("var(--color-red)");
+                playSound('loss');
+            }
+        }
+
+        // --- EVENTS ---
+        slider.addEventListener('input', () => {
+            updateUI('slider');
+            rollMarkerWrapper.style.opacity = 0; // Hide old result when dragging
+            resultBanner.classList.remove('show');
+        });
+        
+        inputTarget.addEventListener('change', () => updateUI('target'));
+        inputMultiplier.addEventListener('change', () => updateUI('multiplier'));
+        inputChance.addEventListener('change', () => updateUI('chance'));
+        betInput.addEventListener('input', updateProfit);
+
+        flipBtn.addEventListener('click', () => {
+            isRollOver = !isRollOver;
+            targetLabel.textContent = isRollOver ? "Roll Over" : "Roll Under";
+            flipBtn.textContent = isRollOver ? "Roll Over ↺" : "Roll Under ↺";
+            
+            const currentChance = parseFloat(inputChance.value);
+            const newTarget = isRollOver ? (100 - currentChance) : currentChance;
+            slider.value = newTarget.toFixed(2);
+            
+            updateUI('slider');
+            rollMarkerWrapper.style.opacity = 0;
+            resultBanner.classList.remove('show');
+        });
+
+        betBtn.addEventListener('click', rollDice);
+
+        // Initialize display
+        updateUI('slider');
+    </script>
+</body>
+</html>
