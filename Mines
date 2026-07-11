@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mines - Stake Clone (Auto & Manual)</title>
+    <style>
+        :root {
+            --bg-main: #1a2c38;
+            --bg-panel: #0f212e;
+            --bg-tile: #2f4553;
+            --bg-tile-hover: #557086;
+            --bg-tile-active: #071824;
+            --text-main: #ffffff;
+            --text-muted: #b1bad3;
+            --color-green: #00e701;
+            --color-green-hover: #1fff22;
+            --color-red: #ff4d4d;
+            --color-gold: #e5b300;
+            --border-input: #213743;
+            --bg-input: #1a2c38;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Top Navbar/Header */
+        .header {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--bg-panel);
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .logo span {
+            color: var(--color-green);
+        }
+
+        .balance-container {
+            background-color: var(--bg-panel);
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid var(--border-input);
+        }
+
+        .balance-label {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .balance-amount {
+            color: var(--text-main);
+            font-size: 18px;
+            transition: color 0.3s;
+        }
+
+        /* Game Container Layout */
+        .game-container {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+            background-color: var(--bg-panel);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* Left Side: Controls Panel */
+        .control-panel {
+            width: 320px;
+            background-color: var(--bg-panel);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 2px solid var(--bg-main);
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+
+        /* Tabs System */
+        .tabs {
+            display: flex;
+            background-color: var(--bg-input);
+            border-radius: 4px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background-color: var(--bg-tile);
+            color: var(--text-main);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-label {
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-wrapper input, .input-wrapper select {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 2px solid var(--border-input);
+            border-radius: 4px;
+            padding: 12px;
+            color: var(--text-main);
+            font-size: 15px;
+            font-weight: bold;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-wrapper input:focus, .input-wrapper select:focus {
+            border-color: var(--text-muted);
+        }
+
+        .currency-symbol {
+            position: absolute;
+            right: 12px;
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+
+        .btn-action {
+            background-color: var(--color-green);
+            color: #000000;
+            border: none;
+            border-radius: 4px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-action:hover {
+            background-color: var(--color-green-hover);
+        }
+
+        .btn-action:active {
+            transform: scale(0.98);
+        }
+
+        .btn-action:disabled {
+            background-color: var(--border-input);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-action.cashout {
+            background-color: var(--color-gold);
+            color: #000;
+        }
+        .btn-action.cashout:hover { background-color: #ffd214; }
+
+        .btn-action.stop-auto {
+            background-color: var(--color-red);
+            color: #fff;
+        }
+        .btn-action.stop-auto:hover { background-color: #ff3333; }
+
+        .sub-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tile);
+            color: var(--text-main);
+            border: none;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            flex: 1;
+            transition: background-color 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-tile-hover);
+        }
+
+        /* Live stats display */
+        .stats-display {
+            background-color: var(--bg-input);
+            border-radius: 4px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 14px;
+            border: 1px solid var(--border-input);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-label { color: var(--text-muted); }
+        .stat-value { font-weight: bold; }
+
+        /* Right Side: Board Panel */
+        .board-panel {
+            flex: 1;
+            background-color: var(--bg-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 12px;
+            width: 100%;
+            max-width: 460px;
+            aspect-ratio: 1 / 1;
+        }
+
+        .tile {
+            background-color: var(--bg-tile);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 4px 0px #21323d;
+        }
+
+        .tile:hover:not(.disabled) {
+            background-color: var(--bg-tile-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0px #21323d;
+        }
+
+        .tile:active:not(.disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0px #21323d;
+        }
+
+        /* Tile States */
+        .tile.disabled {
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Auto-mode pre-selection styling */
+        .tile.queued {
+            background-color: var(--bg-tile-hover);
+            border: 2px dashed var(--color-green);
+        }
+
+        .tile.revealed-gem {
+            background-color: var(--bg-tile-active) !important;
+            transform: none !important;
+            box-shadow: none !important;
+            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .tile.revealed-mine {
+            background-color: #2c1616 !important;
+            transform: none !important;
+            box-shadow: none !important;
+            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .tile.dimmed {
+            opacity: 0.35;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .icon { width: 65%; height: 65%; }
+
+        @keyframes popIn {
+            0% { transform: scale(0.6); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 800px) {
+            body { padding: 10px; }
+            .game-container { flex-direction: column; }
+            .control-panel { width: 100%; border-right: none; border-bottom: 2px solid var(--bg-main); max-height: none;}
+            .board-panel { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">STAKE<span>MINES</span></div>
+        <div class="balance-container">
+            <span class="balance-label">Balance</span>
+            <span class="balance-amount" id="balance-display">$1,000.00</span>
+        </div>
+    </div>
+
+    <div class="game-container">
+        
+        <!-- Left Sidebar Options -->
+        <div class="control-panel">
+            
+            <!-- Manual / Auto Switcher -->
+            <div class="tabs">
+                <button class="tab-btn active" id="tab-manual" onclick="setMode('manual')">Manual</button>
+                <button class="tab-btn" id="tab-auto" onclick="setMode('auto')">Auto</button>
+            </div>
+
+            <!-- Standard Inputs (Shared) -->
+            <div class="input-group">
+                <label class="input-label" for="bet-amount">Bet Amount</label>
+                <div class="input-wrapper">
+                    <input type="number" id="bet-amount" value="10.00" min="0.01" step="1.00">
+                    <span class="currency-symbol">USD</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label" for="mines-count">Mines</label>
+                <div class="input-wrapper">
+                    <select id="mines-count">
+                        <option value="1">1</option><option value="2">2</option>
+                        <option value="3" selected>3</option><option value="4">4</option>
+                        <option value="5">5</option><option value="6">6</option>
+                        <option value="7">7</option><option value="8">8</option>
+                        <option value="9">9</option><option value="10">10</option>
+                        <option value="11">11</option><option value="12">12</option>
+                        <option value="13">13</option><option value="14">14</option>
+                        <option value="15">15</option><option value="16">16</option>
+                        <option value="17">17</option><option value="18">18</option>
+                        <option value="19">19</option><option value="20">20</option>
+                        <option value="21">21</option><option value="22">22</option>
+                        <option value="23">23</option><option value="24">24</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Auto-Specific Inputs (Hidden in Manual Mode) -->
+            <div id="auto-controls" style="display: none; flex-direction: column; gap: 20px;">
+                <div class="input-group">
+                    <label class="input-label" for="number-of-bets">Number of Bets (0 for infinite)</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="number-of-bets" value="0" min="0" step="1">
+                        <span class="currency-symbol">∞</span>
+                    </div>
+                </div>
+                
+                <div class="sub-buttons">
+                    <button class="btn-secondary" onclick="pickRandomAutoTile()">Pick Random Tile</button>
+                    <button class="btn-secondary" onclick="clearAutoTiles()">Clear Tiles</button>
+                </div>
+            </div>
+
+            <button class="btn-action" id="primary-btn">Bet</button>
+
+            <!-- Dynamic Stats Panel -->
+            <div class="stats-display">
+                <div class="stat-row">
+                    <span class="stat-label">Mines Hit / Total</span>
+                    <span class="stat-value" id="stat-mines-info">0 / 3</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Current Multiplier</span>
+                    <span class="stat-value" id="stat-multiplier">0.00x</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label" id="label-next-mult">Next Multiplier</span>
+                    <span class="stat-value" id="stat-next-multiplier">1.13x</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Profit on Win</span>
+                    <span class="stat-value" id="stat-profit" style="color: var(--color-green);">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right 5x5 Matrix Board Grid -->
+        <div class="board-panel">
+            <div class="grid" id="mines-grid">
+                <!-- 25 Tiles populated dynamically via script -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game State Variables
+        let balance = 1000.00;
+        let currentBet = 0.00;
+        let minesCount = 3;
+        let activeGame = false;
+        let successfulPicks = 0;
+        let minePositions = [];
+        let tilesRevealed = [];
+        
+        // Auto System States
+        let isAutoMode = false;
+        let autoSelectedSpots = [];
+        let autoActive = false;
+        let autoBetsRemaining = 0;
+        let autoLoopTimer = null;
+
+        // DOM Elements
+        const balanceDisplay = document.getElementById('balance-display');
+        const betInput = document.getElementById('bet-amount');
+        const minesSelect = document.getElementById('mines-count');
+        const primaryBtn = document.getElementById('primary-btn');
+        const gridContainer = document.getElementById('mines-grid');
+        const autoControls = document.getElementById('auto-controls');
+        const autoNumBetsInput = document.getElementById('number-of-bets');
+        
+        const statMinesInfo = document.getElementById('stat-mines-info');
+        const statMultiplier = document.getElementById('stat-multiplier');
+        const statNextMultiplier = document.getElementById('stat-next-multiplier');
+        const statProfit = document.getElementById('stat-profit');
+
+        // SVG Graphics Strings 
+        const GEM_SVG = `<svg class="icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M32 2L56 26L32 62L8 26L32 2Z" fill="#00E701"/><path d="M32 2L44 26L32 44L20 26L32 2Z" fill="#1FFF22"/><path d="M32 2L32 44L20 26L32 2Z" fill="#FFFFFF" opacity="0.3"/></svg>`;
+        const MINE_SVG = `<svg class="icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="18" fill="#FF4D4D"/><path d="M32 6V14M32 50V58M6 32H14M50 32H58M13.6 13.6L19.3 19.3M44.7 44.7L50.4 50.4M13.6 50.4L19.3 44.7M44.7 19.3L50.4 13.6" stroke="#FF4D4D" stroke-width="4" stroke-linecap="round"/><circle cx="26" cy="26" r="4" fill="#FFFFFF" opacity="0.6"/></svg>`;
+
+        // Audio System Setup
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        // Combinatorics Formula (99% RTP)
+        function nCr(n, r) {
+            if (r < 0 || r > n) return 0;
+            if (r === 0 || r === n) return 1;
+            if (r > n / 2) r = n - r;
+            let res = 1;
+            for (let i = 1; i <= r; i++) { res = res * (n - r + i) / i; }
+            return res;
+        }
+
+        function calculateMultiplier(mines, picks) {
+            if (picks === 0) return 0;
+            const totalTiles = 25;
+            const gems = totalTiles - mines;
+            if (picks > gems) return 0;
+            const probability = nCr(gems, picks) / nCr(totalTiles, picks);
+            const mult = 0.99 / probability;
+            return Math.floor(mult * 100) / 100;
+        }
+
+        function formatMoney(amount) {
+            return '$' + amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+
+        function flashBalance(color) {
+            balanceDisplay.style.color = color;
+            setTimeout(() => { balanceDisplay.style.color = "var(--text-main)"; }, 300);
+        }
+
+        /* ---------------------------------
+           CORE UI & TAB LOGIC
+        --------------------------------- */
+        function setMode(mode) {
+            if (activeGame || autoActive) return; // Prevent switching mid-game
+            
+            isAutoMode = (mode === 'auto');
+            document.getElementById('tab-manual').classList.toggle('active', !isAutoMode);
+            document.getElementById('tab-auto').classList.toggle('active', isAutoMode);
+            
+            autoControls.style.display = isAutoMode ? 'flex' : 'none';
+            primaryBtn.textContent = isAutoMode ? "Start Autobet" : "Bet";
+            
+            document.getElementById('label-next-mult').textContent = isAutoMode ? "Target Multiplier" : "Next Multiplier";
+            
+            buildGrid();
+            updateStats();
+        }
+
+        function buildGrid() {
+            gridContainer.innerHTML = '';
+            for (let i = 0; i < 25; i++) {
+                const tile = document.createElement('div');
+                tile.classList.add('tile');
+                if (!isAutoMode) tile.classList.add('disabled');
+                
+                // Re-apply queued state if we are rebuilding the grid in auto mode
+                if (isAutoMode && autoSelectedSpots.includes(i)) {
+                    tile.classList.add('queued');
+                }
+                
+                tile.dataset.index = i;
+                tile.addEventListener('click', () => handleTileClick(i));
+                gridContainer.appendChild(tile);
+            }
+        }
+
+        function updateStats() {
+            minesCount = parseInt(minesSelect.value);
+            statMinesInfo.textContent = `0 / ${minesCount}`;
+
+            if (isAutoMode) {
+                // In Auto mode, we show the targeted multiplier for the queued spots
+                const picks = autoSelectedSpots.length;
+                const targetMult = picks > 0 ? calculateMultiplier(minesCount, picks) : 0;
+                statMultiplier.textContent = "0.00x";
+                statNextMultiplier.textContent = targetMult > 0 ? `${targetMult.toFixed(2)}x` : "0.00x";
+                statProfit.textContent = formatMoney(parseFloat(betInput.value || 0) * targetMult);
+                return;
+            }
+
+            // Manual Mode Stats
+            if (!activeGame) {
+                statMultiplier.textContent = "0.00x";
+                statNextMultiplier.textContent = calculateMultiplier(minesCount, 1).toFixed(2) + "x";
+                statProfit.textContent = formatMoney(0);
+                return;
+            }
+
+            const currentMult = calculateMultiplier(minesCount, successfulPicks);
+            const nextMult = calculateMultiplier(minesCount, successfulPicks + 1);
+            
+            statMultiplier.textContent = currentMult > 0 ? `${currentMult.toFixed(2)}x` : "0.00x";
+            statNextMultiplier.textContent = nextMult > 0 ? `${nextMult.toFixed(2)}x` : "Max Out";
+            statProfit.textContent = formatMoney(currentBet * currentMult);
+        }
+
+        /* ---------------------------------
+           AUTO MODE SPECIFIC FUNCTIONS
+        --------------------------------- */
+        function pickRandomAutoTile() {
+            if (activeGame || autoActive) return;
+            minesCount = parseInt(minesSelect.value);
+            const maxAllowed = 25 - minesCount;
+            if (autoSelectedSpots.length >= maxAllowed) return;
+
+            let rand;
+            do {
+                rand = Math.floor(Math.random() * 25);
+            } while (autoSelectedSpots.includes(rand));
+
+            autoSelectedSpots.push(rand);
+            document.querySelector(`[data-index="${rand}"]`).classList.add('queued');
+            updateStats();
+        }
+
+        function clearAutoTiles() {
+            if (activeGame || autoActive) return;
+            autoSelectedSpots = [];
+            document.querySelectorAll('.tile').forEach(t => t.classList.remove('queued'));
+            updateStats();
+        }
+
+        function startAutobetSequence() {
+            const betValue = parseFloat(betInput.value);
+            minesCount = parseInt(minesSelect.value);
+            autoBetsRemaining = parseInt(autoNumBetsInput.value);
+
+            if (isNaN(betValue) || betValue <= 0) return alert("Invalid bet amount.");
+            if (autoSelectedSpots.length === 0) return alert("Select at least 1 tile on the grid for Auto Bet.");
+            if (betValue > balance) return alert("Insufficient balance!");
+
+            autoActive = true;
+            betInput.disabled = true;
+            minesSelect.disabled = true;
+            autoNumBetsInput.disabled = true;
+            
+            document.querySelectorAll('.btn-secondary').forEach(b => b.disabled = true);
+            
+            primaryBtn.textContent = "Stop Autobet";
+            primaryBtn.classList.add('stop-auto');
+
+            executeAutoRound();
+        }
+
+        function stopAutobetSequence() {
+            autoActive = false;
+            clearTimeout(autoLoopTimer);
+            primaryBtn.textContent = "Start Autobet";
+            primaryBtn.classList.remove('stop-auto');
+            
+            betInput.disabled = false;
+            minesSelect.disabled = false;
+            autoNumBetsInput.disabled = false;
+            document.querySelectorAll('.btn-secondary').forEach(b => b.disabled = false);
+            
+            buildGrid(); // Reset grid visuals back to queued states
+        }
+
+        function executeAutoRound() {
+            if (!autoActive) return;
+            
+            const betValue = parseFloat(betInput.value);
+            
+            // Check balance and iterations
+            if (betValue > balance) {
+                alert("Autobet stopped: Insufficient balance.");
+                stopAutobetSequence();
+                return;
+            }
+            if (parseInt(autoNumBetsInput.value) !== 0 && autoBetsRemaining <= 0) {
+                stopAutobetSequence();
+                return;
+            }
+
+            // Deduct Bet
+            balance -= betValue;
+            balanceDisplay.textContent = formatMoney(balance);
+            currentBet = betValue;
+            
+            // Generate Mines
+            minePositions = [];
+            while (minePositions.length < minesCount) {
+                let randPos = Math.floor(Math.random() * 25);
+                if (!minePositions.includes(randPos)) minePositions.push(randPos);
+            }
+
+            // Clear board
+            const tiles = document.querySelectorAll('.tile');
+            tiles.forEach(t => {
+                t.className = 'tile disabled'; 
+                t.innerHTML = '';
+            });
+
+            // Instant Evaluation
+            let hitMine = false;
+            for (let i = 0; i < autoSelectedSpots.length; i++) {
+                const spot = autoSelectedSpots[i];
+                const t = document.querySelector(`[data-index="${spot}"]`);
+                
+                if (minePositions.includes(spot)) {
+                    hitMine = true;
+                    t.classList.add('revealed-mine');
+                    t.innerHTML = MINE_SVG;
+                    break; // Stop evaluating further on mine hit
+                } else {
+                    t.classList.add('revealed-gem');
+                    t.innerHTML = GEM_SVG;
+                }
+            }
+
+            // Show rest of the board dimmed
+            tiles.forEach((t, idx) => {
+                if (!autoSelectedSpots.includes(idx) || hitMine && autoSelectedSpots.indexOf(idx) > autoSelectedSpots.indexOf(autoSelectedSpots.find(s => minePositions.includes(s)))) {
+                    if (minePositions.includes(idx)) {
+                        t.classList.add('revealed-mine', 'dimmed');
+                        t.innerHTML = MINE_SVG;
+                    } else {
+                        t.classList.add('revealed-gem', 'dimmed');
+                        t.innerHTML = GEM_SVG;
+                    }
+                }
+            });
+
+            if (hitMine) {
+                // Loss
+                playTone(150, 'sawtooth', 0.2);
+                flashBalance(var_color_red = "#ff4d4d");
+            } else {
+                // Win - Auto Cashout
+                const mult = calculateMultiplier(minesCount, autoSelectedSpots.length);
+                balance += (currentBet * mult);
+                balanceDisplay.textContent = formatMoney(balance);
+                playTone(880, 'sine', 0.2);
+                flashBalance(var_color_green = "#00e701");
+            }
+
+            // Decrease remaining if not infinite
+            if (parseInt(autoNumBetsInput.value) !== 0) {
+                autoBetsRemaining--;
+            }
+
+            // Loop after delay (Simulating Stake's fast auto-bet pacing)
+            autoLoopTimer = setTimeout(executeAutoRound, 1000);
+        }
+
+
+        /* ---------------------------------
+           MANUAL MODE CORE FUNCTIONS
+        --------------------------------- */
+        function handlePrimaryAction() {
+            if (isAutoMode) {
+                if (!autoActive) startAutobetSequence();
+                else stopAutobetSequence();
+                return;
+            }
+
+            // Manual Mode
+            if (!activeGame) startRound();
+            else cashoutRound();
+        }
+
+        function startRound() {
+            const betValue = parseFloat(betInput.value);
+            minesCount = parseInt(minesSelect.value);
+
+            if (isNaN(betValue) || betValue <= 0) return alert("Valid bet amount required.");
+            if (betValue > balance) return alert("Insufficient balance!");
+
+            balance -= betValue;
+            currentBet = betValue;
+            balanceDisplay.textContent = formatMoney(balance);
+            
+            activeGame = true;
+            successfulPicks = 0;
+            tilesRevealed = [];
+            
+            betInput.disabled = true;
+            minesSelect.disabled = true;
+            
+            primaryBtn.textContent = "Cashout";
+            primaryBtn.classList.add('cashout');
+
+            minePositions = [];
+            while (minePositions.length < minesCount) {
+                let randPos = Math.floor(Math.random() * 25);
+                if (!minePositions.includes(randPos)) minePositions.push(randPos);
+            }
+
+            const tiles = document.querySelectorAll('.tile');
+            tiles.forEach(tile => {
+                tile.classList.remove('disabled', 'revealed-gem', 'revealed-mine', 'dimmed', 'queued');
+                tile.innerHTML = '';
+            });
+
+            playTone(440, 'sine', 0.1);
+            updateStats();
+        }
+
+        function handleTileClick(index) {
+            // Auto Mode: Queue up tiles
+            if (isAutoMode && !autoActive) {
+                minesCount = parseInt(minesSelect.value);
+                const maxAllowed = 25 - minesCount;
+                
+                const tileElement = document.querySelector(`[data-index="${index}"]`);
+                
+                if (autoSelectedSpots.includes(index)) {
+                    // Deselect
+                    autoSelectedSpots = autoSelectedSpots.filter(v => v !== index);
+                    tileElement.classList.remove('queued');
+                } else {
+                    // Select
+                    if (autoSelectedSpots.length >= maxAllowed) return; // Reached max safe spots
+                    autoSelectedSpots.push(index);
+                    tileElement.classList.add('queued');
+                }
+                updateStats();
+                return;
+            }
+
+            // Manual Mode: Reveal tiles
+            if (!activeGame || tilesRevealed.includes(index) || isAutoMode) return;
+
+            tilesRevealed.push(index);
+            const tileElement = document.querySelector(`[data-index="${index}"]`);
+
+            if (minePositions.includes(index)) {
+                // Detonated
+                tileElement.classList.add('revealed-mine');
+                tileElement.innerHTML = MINE_SVG;
+                endRound(false);
+            } else {
+                // Safe
+                successfulPicks++;
+                tileElement.classList.add('revealed-gem');
+                tileElement.innerHTML = GEM_SVG;
+                
+                playTone(523.25 + (successfulPicks * 40), 'triangle', 0.15);
+                updateStats();
+
+                if (successfulPicks === (25 - minesCount)) cashoutRound(); // Forced cashout on max win
+            }
+        }
+
+        function cashoutRound() {
+            if (!activeGame || successfulPicks === 0) return;
+            
+            const finalMult = calculateMultiplier(minesCount, successfulPicks);
+            balance += (currentBet * finalMult);
+            balanceDisplay.textContent = formatMoney(balance);
+            playTone(880, 'sine', 0.3); 
+            flashBalance(var_color_green = "#00e701");
+            
+            endRound(true);
+        }
+
+        function endRound(isWin) {
+            activeGame = false;
+            primaryBtn.textContent = "Bet";
+            primaryBtn.classList.remove('cashout');
+            
+            betInput.disabled = false;
+            minesSelect.disabled = false;
+
+            if (!isWin) {
+                playTone(150, 'sawtooth', 0.4);
+                flashBalance(var_color_red = "#ff4d4d");
+            }
+
+            const tiles = document.querySelectorAll('.tile');
+            tiles.forEach((tile, i) => {
+                tile.classList.add('disabled');
+                
+                if (minePositions.includes(i)) {
+                    if (!tilesRevealed.includes(i)) {
+                        tile.classList.add('revealed-mine');
+                        if (!isWin) tile.classList.add('dimmed');
+                        tile.innerHTML = MINE_SVG;
+                    }
+                } else {
+                    if (!tilesRevealed.includes(i)) {
+                        tile.classList.add('revealed-gem', 'dimmed');
+                        tile.innerHTML = GEM_SVG;
+                    }
+                }
+            });
+        }
+
+        // Global Events
+        primaryBtn.addEventListener('click', handlePrimaryAction);
+        minesSelect.addEventListener('change', () => {
+            // Trim auto selections if mines count increases past allowed
+            if (isAutoMode) {
+                const allowed = 25 - parseInt(minesSelect.value);
+                if (autoSelectedSpots.length > allowed) {
+                    autoSelectedSpots = autoSelectedSpots.slice(0, allowed);
+                    buildGrid(); // redraw to clear excess
+                }
+            }
+            updateStats();
+        });
+        betInput.addEventListener('input', () => {
+            let val = parseFloat(betInput.value);
+            if (val > balance) betInput.value = balance.toFixed(2);
+            updateStats();
+        });
+
+        // Init
+        buildGrid();
+        updateStats();
+    </script>
+</body>
+</html>
