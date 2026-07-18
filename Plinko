@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plinko - Premium Stake Clone</title>
+    <style>
+        :root {
+            --bg-main: #1a2c38;
+            --bg-panel: #0f212e;
+            --bg-tile: #2f4553;
+            --text-main: #ffffff;
+            --text-muted: #b1bad3;
+            
+            --color-purple: #7a50ff;
+            --color-green: #00e701;
+            
+            --border-input: #213743;
+            --bg-input: #1a2c38;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            width: 100%;
+            max-width: 1100px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--bg-panel);
+            margin-bottom: 30px;
+        }
+
+        .logo { font-size: 24px; font-weight: bold; letter-spacing: 1px; }
+        .logo span { color: var(--color-purple); }
+
+        .balance-container {
+            background-color: var(--bg-panel);
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid var(--border-input);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .balance-label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+        .balance-amount { color: var(--color-green); font-size: 18px; transition: color 0.2s, text-shadow 0.2s; }
+        .balance-amount.flash { text-shadow: 0 0 10px var(--color-green); color: #fff; }
+
+        /* Game Layout */
+        .game-container {
+            display: flex;
+            width: 100%;
+            max-width: 1100px;
+            background-color: var(--bg-panel);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+
+        /* Controls */
+        .control-panel {
+            width: 320px;
+            background-color: var(--bg-panel);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 2px solid var(--bg-main);
+            z-index: 10;
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        .input-label { color: var(--text-muted); font-size: 14px; font-weight: 600; }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        
+        .input-wrapper input, .input-wrapper select {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 2px solid var(--border-input);
+            border-radius: 4px;
+            padding: 12px;
+            color: var(--text-main);
+            font-size: 15px;
+            font-weight: bold;
+            outline: none;
+            transition: all 0.2s;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-wrapper input:focus, .input-wrapper select:focus { border-color: var(--color-purple); box-shadow: 0 0 8px rgba(122, 80, 255, 0.3); }
+        .currency-symbol { position: absolute; right: 12px; color: var(--text-muted); font-weight: bold; }
+
+        .btn-action {
+            background-color: var(--color-green);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.1s;
+            width: 100%;
+            margin-top: auto;
+            box-shadow: 0 4px 0 #009900;
+        }
+        .btn-action:hover { background-color: #00fa01; transform: translateY(-2px); box-shadow: 0 6px 0 #009900; }
+        .btn-action:active { transform: translateY(4px); box-shadow: 0 0 0 #009900; }
+
+        /* Board */
+        .board-panel {
+            flex: 1;
+            background-color: var(--bg-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 20px;
+            background: radial-gradient(circle at center, #1e3340 0%, #13222c 100%);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            max-width: 900px;
+            background-color: transparent;
+            cursor: crosshair; 
+        }
+
+        @media (max-width: 800px) {
+            .game-container { flex-direction: column; }
+            .control-panel { width: 100%; border-right: none; border-bottom: 2px solid var(--bg-main); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">STAKE<span>PLINKO</span></div>
+        <div class="balance-container">
+            <span class="balance-label">Balance</span>
+            <span class="balance-amount" id="balance-display">$1,000.00</span>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <!-- Left Control Panel -->
+        <div class="control-panel">
+            <div class="input-group">
+                <label class="input-label" for="bet-amount">Bet Amount</label>
+                <div class="input-wrapper">
+                    <input type="number" id="bet-amount" value="10.00" min="0.01" step="1.00">
+                    <span class="currency-symbol">USD</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label" for="risk-level">Risk</label>
+                <div class="input-wrapper">
+                    <select id="risk-level">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high" selected>High</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label" for="rows-level">Rows (8 to 16)</label>
+                <div class="input-wrapper">
+                    <select id="rows-level">
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                        <option value="13">13</option>
+                        <option value="14">14</option>
+                        <option value="15">15</option>
+                        <option value="16" selected>16</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn-action" id="btn-bet">Drop Ball</button>
+        </div>
+
+        <!-- Right Game Board (Canvas) -->
+        <div class="board-panel">
+            <canvas id="plinko-canvas" width="900" height="700"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME CONFIG & PAYOUTS ---
+        let balance = 1000.00;
+        
+        const MULTIPLIERS = {
+            low: {
+                8: [5.6, 2.1, 1.1, 1, 0.5, 1, 1.1, 2.1, 5.6],
+                9: [5.6, 2, 1.6, 1, 0.7, 0.7, 1, 1.6, 2, 5.6],
+                10: [8.9, 3, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 3, 8.9],
+                11: [8.4, 3, 1.9, 1.3, 1, 0.7, 0.7, 1, 1.3, 1.9, 3, 8.4],
+                12: [10, 3, 1.6, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 1.6, 3, 10],
+                13: [8.1, 4, 3, 1.9, 1.2, 0.9, 0.7, 0.7, 0.9, 1.2, 1.9, 3, 4, 8.1],
+                14: [7.1, 4, 1.9, 1.4, 1.3, 1.1, 1, 0.5, 1, 1.1, 1.3, 1.4, 1.9, 4, 7.1],
+                15: [15, 8, 3, 2, 1.5, 1.1, 1, 0.7, 0.7, 1, 1.1, 1.5, 2, 3, 8, 15],
+                16: [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 1.4, 1.4, 2, 9, 16]
+            },
+            medium: {
+                8: [13, 3, 1.3, 0.7, 0.4, 0.7, 1.3, 3, 13],
+                9: [18, 4, 1.7, 0.9, 0.5, 0.5, 0.9, 1.7, 4, 18],
+                10: [22, 5, 2, 1.4, 0.6, 0.4, 0.6, 1.4, 2, 5, 22],
+                11: [24, 6, 3, 1.8, 0.7, 0.5, 0.5, 0.7, 1.8, 3, 6, 24],
+                12: [33, 11, 4, 2, 1.1, 0.6, 0.3, 0.6, 1.1, 2, 4, 11, 33],
+                13: [43, 13, 6, 3, 1.3, 0.7, 0.4, 0.4, 0.7, 1.3, 3, 6, 13, 43],
+                14: [58, 15, 7, 4, 1.9, 1, 0.5, 0.2, 0.5, 1, 1.9, 4, 7, 15, 58],
+                15: [88, 18, 11, 5, 3, 1.3, 0.5, 0.3, 0.3, 0.5, 1.3, 3, 5, 11, 18, 88],
+                16: [110, 41, 10, 5, 3, 1.5, 1, 0.5, 0.3, 0.5, 1, 1.5, 3, 5, 10, 41, 110]
+            },
+            high: {
+                8: [29, 4, 1.5, 0.3, 0.2, 0.3, 1.5, 4, 29],
+                9: [43, 7, 2, 0.6, 0.2, 0.2, 0.6, 2, 7, 43],
+                10: [76, 10, 3, 0.9, 0.3, 0.2, 0.3, 0.9, 3, 10, 76],
+                11: [120, 14, 5.2, 1.4, 0.4, 0.2, 0.2, 0.4, 1.4, 5.2, 14, 120],
+                12: [170, 24, 8.1, 2, 0.7, 0.2, 0.2, 0.7, 2, 8.1, 24, 170],
+                13: [260, 37, 11, 4, 1, 0.2, 0.2, 0.2, 1, 4, 11, 37, 260],
+                14: [420, 56, 18, 5, 1.9, 0.2, 0.2, 0.2, 0.2, 1.9, 5, 18, 56, 420],
+                15: [620, 83, 27, 8, 3, 0.3, 0.2, 0.2, 0.2, 0.3, 3, 8, 27, 83, 620],
+                16: [1000, 130, 26, 9, 4, 2, 0.2, 0.2, 0.2, 0.2, 0.2, 2, 4, 9, 26, 130, 1000]
+            }
+        };
+
+        // Math for Probabilities
+        function factorial(n) { return n <= 1 ? 1 : n * factorial(n - 1); }
+        function choose(n, k) { return factorial(n) / (factorial(k) * factorial(n - k)); }
+        function getProbability(rows, index) { 
+            return ((choose(rows, index) / Math.pow(2, rows)) * 100).toFixed(2); 
+        }
+
+        function getBucketColors(mult) {
+            // Returns [BaseColor, ShadowColor]
+            if (mult < 1) return ["#ffc107", "#b28704"]; 
+            if (mult < 3) return ["#ff9800", "#b26a00"]; 
+            if (mult < 10) return ["#f44336", "#aa2e25"]; 
+            if (mult < 100) return ["#d32f2f", "#932020"]; 
+            return ["#b71c1c", "#7f1313"]; 
+        }
+
+        // --- DOM ELEMENTS ---
+        const canvas = document.getElementById('plinko-canvas');
+        const ctx = canvas.getContext('2d');
+        const balanceDisplay = document.getElementById('balance-display');
+        const betInput = document.getElementById('bet-amount');
+        const riskSelect = document.getElementById('risk-level');
+        const rowsSelect = document.getElementById('rows-level');
+        const dropBtn = document.getElementById('btn-bet');
+
+        // --- CANVAS SETUP ---
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+        const PADDING_TOP = 60;
+        const PADDING_BOTTOM = 80;
+        const BALL_RADIUS = 8;
+        const PEG_RADIUS = 4.5;
+
+        let activeBalls = [];
+        let rows = parseInt(rowsSelect.value);
+        let risk = riskSelect.value;
+        let buckets = []; 
+        let hoverBucket = null;
+
+        // Visual FX State Trackers
+        let activePegs = new Map(); // Tracks peg glow/vibration (Key: "r-c", Value: strength 0-1)
+        let activeBuckets = new Map(); // Tracks bucket pop (Key: index, Value: strength 0-1)
+
+        // Events for tooltips
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            hoverBucket = buckets.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+        });
+        
+        canvas.addEventListener('touchstart', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
+            hoverBucket = buckets.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+        });
+
+        // Audio System
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                if (type === 'tick') {
+                    // Snappy glass/plastic tick
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800 + Math.random()*200, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+                } else if (type === 'win') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+                }
+                osc.connect(gain); gain.connect(audioCtx.destination);
+            } catch(e) {}
+        }
+
+        // Format Money
+        function formatMoney(amount) {
+            return '$' + amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+
+        function flashBalance(mult) {
+            balanceDisplay.classList.add('flash');
+            if (mult > 1) balanceDisplay.style.color = "var(--color-green)";
+            else balanceDisplay.style.color = "var(--text-muted)";
+            setTimeout(() => { 
+                balanceDisplay.classList.remove('flash');
+                balanceDisplay.style.color = "var(--color-green)"; 
+            }, 300);
+        }
+
+        function generatePath(numRows) {
+            let path = [];
+            for (let i = 0; i < numRows; i++) path.push(Math.random() > 0.5 ? 1 : 0);
+            return path;
+        }
+
+        function updateSettings() {
+            rows = parseInt(rowsSelect.value);
+            risk = riskSelect.value;
+            activeBalls = []; 
+            activePegs.clear();
+            activeBuckets.clear();
+            hoverBucket = null;
+        }
+        riskSelect.addEventListener('change', updateSettings);
+        rowsSelect.addEventListener('change', updateSettings);
+
+        // --- DRAWING LOGIC ---
+        function getCoords(r, c) {
+            const rowSpacing = (HEIGHT - PADDING_TOP - PADDING_BOTTOM) / rows;
+            const colSpacing = Math.min(WIDTH / (rows + 2), 52); 
+            const x = WIDTH / 2 + (c - r / 2) * colSpacing;
+            const y = PADDING_TOP + r * rowSpacing;
+            return { x, y, rowSpacing, colSpacing };
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            // Draw Pegs with Vibration FX
+            for (let r = 1; r <= rows; r++) {
+                for (let c = 0; c <= r; c++) {
+                    const { x, y } = getCoords(r, c);
+                    const pegKey = `${r}-${c}`;
+                    let currentRadius = PEG_RADIUS;
+                    
+                    if (activePegs.has(pegKey)) {
+                        let intensity = activePegs.get(pegKey);
+                        currentRadius = PEG_RADIUS + (intensity * 3); // Swell up
+                        
+                        // Peg Glow
+                        ctx.shadowBlur = intensity * 15;
+                        ctx.shadowColor = '#ffffff';
+                        
+                        intensity -= 0.1; // Decay rate
+                        if (intensity <= 0) activePegs.delete(pegKey);
+                        else activePegs.set(pegKey, intensity);
+                    } else {
+                        ctx.shadowBlur = 4;
+                        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    }
+
+                    // Peg Base
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(x, y, currentRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // Draw Buckets
+            buckets = [];
+            const mults = MULTIPLIERS[risk][rows];
+            for (let c = 0; c <= rows; c++) {
+                const { x, y, colSpacing, rowSpacing } = getCoords(rows, c);
+                const mult = mults[c];
+                const colors = getBucketColors(mult);
+                
+                const boxW = colSpacing - 4;
+                const boxH = 36;
+                const boxX = x - boxW / 2;
+                let boxY = y + rowSpacing / 2;
+
+                // Bucket hit animation (push down & glow)
+                let glowIntensity = 0;
+                if (activeBuckets.has(c)) {
+                    let intensity = activeBuckets.get(c);
+                    boxY += (intensity * 6); // Push down
+                    glowIntensity = intensity;
+                    
+                    intensity -= 0.05;
+                    if (intensity <= 0) activeBuckets.delete(c);
+                    else activeBuckets.set(c, intensity);
+                }
+
+                const prob = getProbability(rows, c);
+                buckets.push({ index: c, x: boxX, y: boxY, w: boxW, h: boxH, mult: mult, prob: prob, color: colors[0] });
+
+                // Box Glow
+                if (glowIntensity > 0) {
+                    ctx.shadowBlur = glowIntensity * 20;
+                    ctx.shadowColor = colors[0];
+                }
+
+                // Main Gradient
+                const grad = ctx.createLinearGradient(boxX, boxY, boxX, boxY + boxH);
+                grad.addColorStop(0, colors[0]);
+                grad.addColorStop(1, colors[1]);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+                ctx.fill();
+                ctx.shadowBlur = 0; // reset
+
+                // Inner Shadow Top Highlights (3D feel)
+                ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                ctx.beginPath();
+                ctx.roundRect(boxX, boxY, boxW, 4, {tl: 6, tr: 6, bl: 0, br: 0});
+                ctx.fill();
+
+                // Dark Bottom Edge
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.roundRect(boxX, boxY + boxH - 5, boxW, 5, {bl: 6, br: 6});
+                ctx.fill();
+
+                // Text Formatting
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '900 ' + (rows >= 15 ? '13px' : '15px') + ' sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                let text = mult + 'x';
+                if (rows >= 14 && mult.toString().length >= 3) text = mult;
+                ctx.fillText(text, x, boxY + boxH / 2);
+            }
+        }
+
+        function drawTooltip() {
+            if (!hoverBucket) return;
+            
+            const textChance = hoverBucket.prob + "% Chance";
+            const textMult = hoverBucket.mult + "x Payout";
+            
+            ctx.font = 'bold 16px sans-serif';
+            const w1 = ctx.measureText(textChance).width;
+            const w2 = ctx.measureText(textMult).width;
+            const tw = Math.max(w1, w2) + 30;
+            const th = 60;
+            
+            const tx = hoverBucket.x + hoverBucket.w / 2 - tw / 2;
+            const ty = hoverBucket.y - th - 15;
+
+            // Background
+            ctx.fillStyle = '#0f212e';
+            ctx.shadowColor = 'rgba(0,0,0,0.7)';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.roundRect(tx, ty, tw, th, 8);
+            ctx.fill();
+            
+            // Arrow
+            ctx.beginPath();
+            ctx.moveTo(hoverBucket.x + hoverBucket.w / 2 - 8, ty + th);
+            ctx.lineTo(hoverBucket.x + hoverBucket.w / 2 + 8, ty + th);
+            ctx.lineTo(hoverBucket.x + hoverBucket.w / 2, ty + th + 8);
+            ctx.fill();
+            ctx.shadowBlur = 0; 
+
+            // Text
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = hoverBucket.color; 
+            ctx.fillText(textMult, tx + tw/2, ty + 12);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '14px sans-serif';
+            ctx.fillText(textChance, tx + tw/2, ty + 34);
+        }
+
+        // --- PHYSICS & ANIMATION ---
+        function dropBall() {
+            const betValue = parseFloat(betInput.value);
+            if (isNaN(betValue) || betValue <= 0) return alert("Enter a valid bet amount.");
+            if (betValue > balance) return alert("Insufficient balance.");
+
+            balance -= betValue;
+            balanceDisplay.textContent = formatMoney(balance);
+
+            const path = generatePath(rows);
+            const bucketIndex = path.reduce((a, b) => a + b, 0);
+            const multiplier = MULTIPLIERS[risk][rows][bucketIndex];
+
+            // Initial center position randomness so they don't perfectly overlap
+            const startOffset = (Math.random() - 0.5) * 10;
+
+            activeBalls.push({
+                x: WIDTH / 2 + startOffset,
+                y: PADDING_TOP - 20, // Start slightly higher
+                path: path,
+                row: 0,
+                col: 0,
+                progress: 0,
+                bet: betValue,
+                multiplier: multiplier,
+                finalBucket: bucketIndex,
+                history: [] // For motion blur trail
+            });
+        }
+
+        function updateAndDrawBalls() {
+            drawBoard();
+
+            const speed = 0.085; // Fall speed
+            const arcHeight = 18; // Height of bounce
+
+            for (let i = activeBalls.length - 1; i >= 0; i--) {
+                let ball = activeBalls[i];
+                
+                // Save history for trail (keep last 5 frames)
+                ball.history.push({x: ball.x, y: ball.y});
+                if (ball.history.length > 5) ball.history.shift();
+
+                ball.progress += speed;
+
+                // Hit a peg
+                if (ball.progress >= 1) {
+                    ball.progress -= 1;
+                    ball.col += ball.path[ball.row];
+                    ball.row += 1;
+                    
+                    playSound('tick');
+                    
+                    // Trigger peg vibration for the peg we just landed on
+                    activePegs.set(`${ball.row}-${ball.col}`, 1.0);
+
+                    // Reached the bottom
+                    if (ball.row >= rows) {
+                        const win = ball.bet * ball.multiplier;
+                        balance += win;
+                        balanceDisplay.textContent = formatMoney(balance);
+                        flashBalance(ball.multiplier);
+                        if (ball.multiplier > 1) playSound('win');
+                        
+                        // Trigger bucket hit animation
+                        activeBuckets.set(ball.finalBucket, 1.0);
+                        
+                        activeBalls.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                // Physics Interpolation
+                const startNode = getCoords(ball.row, ball.col);
+                const nextCol = ball.col + ball.path[ball.row];
+                const endNode = getCoords(ball.row + 1, nextCol);
+
+                // Linear X movement
+                ball.x = startNode.x + (endNode.x - startNode.x) * ball.progress;
+                
+                // Parabolic Y movement for gravity feel: 4 * p * (1 - p) creates a curve that peaks at 0.5
+                const parabola = 4 * ball.progress * (1 - ball.progress);
+                
+                // Linear Y downward base + upward arc offset
+                ball.y = startNode.y + (endNode.y - startNode.y) * ball.progress - (parabola * arcHeight);
+
+                // DRAW MOTION TRAIL
+                for (let t = 0; t < ball.history.length; t++) {
+                    const pt = ball.history[t];
+                    const alpha = (t + 1) / ball.history.length * 0.4; // Fade out older points
+                    ctx.fillStyle = `rgba(255, 23, 68, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, BALL_RADIUS * 0.8, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // DRAW ACTUAL BALL (3D Sphere effect)
+                const ballGrad = ctx.createRadialGradient(
+                    ball.x - 2, ball.y - 2, 1, 
+                    ball.x, ball.y, BALL_RADIUS
+                );
+                ballGrad.addColorStop(0, '#ff8a80'); // highlight
+                ballGrad.addColorStop(0.5, '#ff1744'); // base
+                ballGrad.addColorStop(1, '#b71c1c'); // shadow
+
+                ctx.shadowColor = 'rgba(255, 23, 68, 0.6)';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = ballGrad; 
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0; 
+            }
+
+            drawTooltip();
+
+            requestAnimationFrame(updateAndDrawBalls);
+        }
+
+        // --- INIT ---
+        dropBtn.addEventListener('click', dropBall);
+        
+        // Initial setup calls
+        updateSettings();
+        updateAndDrawBalls(); // Kick off render loop
+
+    </script>
+</body>
+</html>
