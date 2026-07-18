@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keno - Stake Clone</title>
+    <style>
+        :root {
+            --bg-main: #1a2c38;
+            --bg-panel: #0f212e;
+            --bg-tile: #2f4553;
+            --bg-tile-hover: #557086;
+            --text-main: #ffffff;
+            --text-muted: #b1bad3;
+            
+            /* Custom Keno Colors */
+            --color-purple: #7a50ff;
+            --color-purple-hover: #916aff;
+            --color-green: #00e701;
+            --color-red: #ed4163;
+            --color-red-translucent: rgba(237, 65, 99, 0.15);
+            
+            --border-input: #213743;
+            --bg-input: #1a2c38;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--bg-panel);
+            margin-bottom: 30px;
+        }
+
+        .logo { font-size: 24px; font-weight: bold; letter-spacing: 1px; }
+        .logo span { color: var(--color-purple); }
+
+        .balance-container {
+            background-color: var(--bg-panel);
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid var(--border-input);
+        }
+
+        .balance-label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+        .balance-amount { color: var(--text-main); font-size: 18px; transition: color 0.3s; }
+
+        /* Game Layout */
+        .game-container {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+            background-color: var(--bg-panel);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* Left Side: Controls */
+        .control-panel {
+            width: 320px;
+            background-color: var(--bg-panel);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 2px solid var(--bg-main);
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        .input-label { color: var(--text-muted); font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        
+        .input-wrapper input, .input-wrapper select {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 2px solid var(--border-input);
+            border-radius: 4px;
+            padding: 12px;
+            color: var(--text-main);
+            font-size: 15px;
+            font-weight: bold;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-wrapper input:focus, .input-wrapper select:focus { border-color: var(--text-muted); }
+        .currency-symbol { position: absolute; right: 12px; color: var(--text-muted); font-weight: bold; }
+
+        .btn-action {
+            background-color: var(--color-green);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-action:hover { background-color: var(--color-green-hover); }
+        .btn-action:active { transform: scale(0.98); }
+        .btn-action:disabled { background-color: var(--border-input); color: var(--text-muted); cursor: not-allowed; }
+
+        .sub-buttons { display: flex; gap: 10px; }
+        .btn-secondary {
+            background-color: var(--bg-tile);
+            color: var(--text-main);
+            border: none;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            flex: 1;
+            transition: background-color 0.2s;
+        }
+        .btn-secondary:hover { background-color: var(--bg-tile-hover); }
+
+        /* Right Side: Board & Multipliers */
+        .board-panel {
+            flex: 1;
+            background-color: var(--bg-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            gap: 30px;
+            position: relative;
+        }
+
+        /* 8x5 Keno Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .tile {
+            background-color: var(--bg-tile);
+            color: var(--text-main);
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1 / 1;
+            box-shadow: 0 4px 0px #21323d;
+            transition: all 0.15s;
+            border: 2px solid transparent;
+        }
+
+        .tile:hover:not(.locked) {
+            background-color: var(--bg-tile-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0px #21323d;
+        }
+
+        .tile:active:not(.locked) {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0px #21323d;
+        }
+
+        .tile.locked { cursor: not-allowed; }
+
+        /* User Picked */
+        .tile.selected {
+            background-color: var(--color-purple);
+            box-shadow: 0 4px 0px #5c3bc2;
+        }
+        .tile.selected:hover:not(.locked) {
+            background-color: var(--color-purple-hover);
+            box-shadow: 0 6px 0px #5c3bc2;
+        }
+
+        /* Game Result Animations */
+        .tile.hit {
+            background-color: var(--color-green) !important;
+            color: #000 !important;
+            box-shadow: 0 4px 0px #00a101 !important;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-color: transparent !important;
+        }
+
+        .tile.miss {
+            background-color: var(--color-red-translucent) !important;
+            color: var(--color-red) !important;
+            border: 2px solid var(--color-red) !important;
+            box-shadow: none !important;
+            transform: translateY(2px);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Multiplier Payout Bar */
+        .payout-bar {
+            display: flex;
+            width: 100%;
+            max-width: 600px;
+            gap: 6px;
+            height: 60px;
+        }
+
+        .payout-box {
+            flex: 1;
+            background-color: var(--bg-panel);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-input);
+            transition: all 0.2s;
+            opacity: 0.5;
+        }
+        
+        .payout-box.active {
+            opacity: 1;
+        }
+
+        .payout-box.highlight {
+            background-color: var(--color-purple);
+            border-color: var(--color-purple);
+            color: #fff;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(122, 80, 255, 0.4);
+            opacity: 1;
+        }
+
+        .payout-hits { font-size: 12px; font-weight: bold; opacity: 0.8; }
+        .payout-mult { font-size: 14px; font-weight: 900; }
+
+        @media (max-width: 800px) {
+            .game-container { flex-direction: column; }
+            .control-panel { width: 100%; border-right: none; border-bottom: 2px solid var(--bg-main); }
+            .grid { max-width: 100%; gap: 6px; }
+            .tile { font-size: 14px; }
+            .payout-bar { height: 50px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">STAKE<span>KENO</span></div>
+        <div class="balance-container">
+            <span class="balance-label">Balance</span>
+            <span class="balance-amount" id="balance-display">$1,000.00</span>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <!-- Left Control Panel -->
+        <div class="control-panel">
+            <div class="input-group">
+                <label class="input-label" for="bet-amount">Bet Amount</label>
+                <div class="input-wrapper">
+                    <input type="number" id="bet-amount" value="10.00" min="0.01" step="1.00">
+                    <span class="currency-symbol">USD</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label" for="risk-level">Risk</label>
+                <div class="input-wrapper">
+                    <select id="risk-level">
+                        <option value="classic" selected>Classic</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sub-buttons">
+                <button class="btn-secondary" id="btn-autopick">Auto Pick</button>
+                <button class="btn-secondary" id="btn-clear">Clear Table</button>
+            </div>
+
+            <button class="btn-action" id="btn-bet">Bet</button>
+        </div>
+
+        <!-- Right Game Board -->
+        <div class="board-panel">
+            <!-- Grid (1-40) -->
+            <div class="grid" id="keno-grid"></div>
+
+            <!-- Dynamic Payout Bar -->
+            <div class="payout-bar" id="payout-bar">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Structures & Game State
+        let balance = 1000.00;
+        let selectedTiles = [];
+        let activeGame = false;
+        const MAX_PICKS = 10;
+        const GRID_SIZE = 40;
+        const DRAW_COUNT = 10;
+
+        // Realistic Stake Keno Multiplier Tables [0 hits, 1 hit, 2 hits, ... up to N hits]
+        const PAYOUTS = {
+            classic: {
+                1: [0, 3.8],
+                2: [0, 0, 13],
+                3: [0, 0, 2.7, 48],
+                4: [0, 0, 1.7, 10, 89],
+                5: [0, 0, 1.4, 4, 14, 290],
+                6: [0, 0, 0, 3, 9, 45, 700],
+                7: [0, 0, 0, 2, 4, 17, 100, 700],
+                8: [0, 0, 0, 0, 4.5, 12, 50, 250, 700],
+                9: [0, 0, 0, 0, 2.5, 7, 25, 100, 300, 700],
+                10: [0, 0, 0, 0, 1.5, 4.5, 15, 47, 100, 300, 700]
+            },
+            low: {
+                1: [0.7, 1.8],
+                2: [0.7, 1.1, 3.8],
+                3: [0.7, 1.1, 1.3, 14],
+                4: [0.7, 0.9, 1.2, 3.5, 30],
+                5: [0.7, 0.8, 1.1, 2.7, 8, 50],
+                6: [0.7, 0.8, 1.1, 1.9, 4.5, 20, 80],
+                7: [0.7, 0.8, 1, 1.7, 3, 10, 45, 120],
+                8: [0.7, 0.8, 1, 1.5, 2.5, 5, 20, 60, 150],
+                9: [0.7, 0.8, 1, 1.3, 2, 4, 10, 35, 90, 200],
+                10: [0.7, 0.8, 1, 1.2, 1.6, 2.5, 5, 15, 50, 100, 250]
+            },
+            medium: {
+                1: [0, 3.8],
+                2: [0, 0, 14],
+                3: [0, 0, 2.7, 48],
+                4: [0, 0, 1.7, 10, 89],
+                5: [0, 0, 1.4, 4, 14, 290],
+                6: [0, 0, 0, 3, 9, 45, 700],
+                7: [0, 0, 0, 2, 4, 17, 100, 700],
+                8: [0, 0, 0, 0, 4.5, 12, 50, 250, 1000],
+                9: [0, 0, 0, 0, 2.5, 7, 25, 100, 300, 1000],
+                10: [0, 0, 0, 0, 1.5, 4.5, 15, 47, 100, 300, 1000]
+            },
+            high: {
+                1: [0, 3.8],
+                2: [0, 0, 15],
+                3: [0, 0, 0, 81],
+                4: [0, 0, 0, 11, 250],
+                5: [0, 0, 0, 0, 45, 750],
+                6: [0, 0, 0, 0, 12, 110, 1000],
+                7: [0, 0, 0, 0, 0, 30, 250, 1500],
+                8: [0, 0, 0, 0, 0, 12, 70, 600, 2500],
+                9: [0, 0, 0, 0, 0, 5, 35, 200, 1000, 5000],
+                10: [0, 0, 0, 0, 0, 4, 11, 67, 400, 1000, 10000] 
+            }
+        };
+
+        // DOM Elements
+        const gridContainer = document.getElementById('keno-grid');
+        const payoutBar = document.getElementById('payout-bar');
+        const betBtn = document.getElementById('btn-bet');
+        const autoPickBtn = document.getElementById('btn-autopick');
+        const clearBtn = document.getElementById('btn-clear');
+        const betInput = document.getElementById('bet-amount');
+        const riskSelect = document.getElementById('risk-level');
+        const balanceDisplay = document.getElementById('balance-display');
+
+        // Audio System (Web Audio API)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                if (type === 'tick') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                } else if (type === 'hit') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+                } else if (type === 'win') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+                }
+                osc.connect(gain); gain.connect(audioCtx.destination);
+            } catch(e) {}
+        }
+
+        // Wipe old hits and misses
+        function resetGridVisuals() {
+            document.querySelectorAll('.tile').forEach(tile => {
+                tile.classList.remove('hit', 'miss');
+            });
+            // Reset payout bar visuals from the last game too
+            renderPayouts(-1); 
+        }
+
+        // Initialize Grid
+        function buildGrid() {
+            gridContainer.innerHTML = '';
+            for (let i = 1; i <= GRID_SIZE; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.textContent = i;
+                tile.dataset.num = i;
+                tile.addEventListener('click', () => toggleTile(i));
+                gridContainer.appendChild(tile);
+            }
+        }
+
+        // Handle Selecting Numbers
+        function toggleTile(num) {
+            if (activeGame) return;
+
+            // Instantly clear old results when the user changes a square
+            resetGridVisuals();
+
+            const idx = selectedTiles.indexOf(num);
+            if (idx > -1) {
+                selectedTiles.splice(idx, 1);
+            } else {
+                if (selectedTiles.length >= MAX_PICKS) {
+                    return; 
+                }
+                selectedTiles.push(num);
+            }
+            renderTiles();
+            renderPayouts();
+        }
+
+        // Update visual state of all 40 tiles
+        function renderTiles() {
+            document.querySelectorAll('.tile').forEach(tile => {
+                const num = parseInt(tile.dataset.num);
+                if (selectedTiles.includes(num)) {
+                    tile.classList.add('selected');
+                } else {
+                    tile.classList.remove('selected');
+                }
+            });
+        }
+        
+        // Construct Bottom Payout Multiplier Bar
+        function renderPayouts(currentHits = -1) {
+            payoutBar.innerHTML = '';
+            const risk = riskSelect.value;
+            const count = selectedTiles.length;
+            
+            if (count === 0) return;
+
+            const arr = PAYOUTS[risk][count];
+            
+            arr.forEach((mult, hitsCount) => {
+                const box = document.createElement('div');
+                box.className = 'payout-box';
+                
+                if (count > 0) box.classList.add('active');
+                
+                if (currentHits === hitsCount) {
+                    box.classList.add('highlight');
+                }
+
+                box.innerHTML = `
+                    <div class="payout-hits">${hitsCount}x</div>
+                    <div class="payout-mult">${mult}x</div>
+                `;
+                payoutBar.appendChild(box);
+            });
+        }
+
+        function clearTable() {
+            if (activeGame) return;
+            
+            // Instantly clear old results
+            resetGridVisuals();
+            
+            selectedTiles = [];
+            renderTiles();
+            renderPayouts();
+        }
+
+        function autoPick() {
+            if (activeGame) return;
+            
+            // Instantly clear old results
+            resetGridVisuals();
+            
+            if (selectedTiles.length === MAX_PICKS) selectedTiles = [];
+            
+            const pool = [];
+            for (let i = 1; i <= GRID_SIZE; i++) {
+                if (!selectedTiles.includes(i)) pool.push(i);
+            }
+
+            pool.sort(() => 0.5 - Math.random());
+            const needed = MAX_PICKS - selectedTiles.length;
+            const newPicks = pool.slice(0, needed);
+            
+            selectedTiles = [...selectedTiles, ...newPicks];
+            renderTiles();
+            renderPayouts();
+        }
+
+        function formatMoney(amount) {
+            return '$' + amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+        
+        function flashBalance(color) {
+            balanceDisplay.style.color = color;
+            setTimeout(() => { balanceDisplay.style.color = "var(--text-main)"; }, 300);
+        }
+
+        // Main Game Loop
+        function playKeno() {
+            if (activeGame) return;
+            if (selectedTiles.length === 0) return alert("Please select at least 1 number to play.");
+
+            const betValue = parseFloat(betInput.value);
+            if (isNaN(betValue) || betValue <= 0) return alert("Enter a valid bet amount.");
+            if (betValue > balance) return alert("Insufficient balance.");
+
+            // Clear old results instantly
+            resetGridVisuals();
+
+            // Start state
+            activeGame = true;
+            balance -= betValue;
+            balanceDisplay.textContent = formatMoney(balance);
+            
+            // Lock UI
+            betBtn.disabled = true;
+            autoPickBtn.disabled = true;
+            clearBtn.disabled = true;
+            riskSelect.disabled = true;
+            betInput.disabled = true;
+            
+            // Reset payout bar visuals for the new round
+            renderPayouts(0);
+
+            // Generate 10 Random Winning Numbers
+            const drawnNumbers = [];
+            while (drawnNumbers.length < DRAW_COUNT) {
+                let r = Math.floor(Math.random() * GRID_SIZE) + 1;
+                if (!drawnNumbers.includes(r)) drawnNumbers.push(r);
+            }
+
+            // Animation Sequence
+            let hits = 0;
+            let currentDrawIndex = 0;
+
+            const drawInterval = setInterval(() => {
+                const drawnNum = drawnNumbers[currentDrawIndex];
+                const tile = document.querySelector(`.tile[data-num="${drawnNum}"]`);
+                
+                if (selectedTiles.includes(drawnNum)) {
+                    // It's a Hit! (Green)
+                    tile.classList.add('hit');
+                    hits++;
+                    playSound('hit');
+                } else {
+                    // Miss (Translucent Red Box)
+                    tile.classList.add('miss');
+                    playSound('tick');
+                }
+
+                // Update Payout Bar UI dynamically as hits climb
+                renderPayouts(hits);
+
+                currentDrawIndex++;
+
+                // End of round evaluation
+                if (currentDrawIndex >= DRAW_COUNT) {
+                    clearInterval(drawInterval);
+                    finishRound(betValue, hits);
+                }
+            }, 150); 
+        }
+
+        function finishRound(betValue, hits) {
+            const risk = riskSelect.value;
+            const count = selectedTiles.length;
+            const finalMultiplier = PAYOUTS[risk][count][hits];
+            
+            const winnings = betValue * finalMultiplier;
+            balance += winnings;
+
+            if (winnings > 0) {
+                playSound('win');
+                flashBalance("var(--color-green)");
+            } else {
+                flashBalance("var(--color-red)");
+            }
+
+            balanceDisplay.textContent = formatMoney(balance);
+
+            // Unlock UI
+            activeGame = false;
+            betBtn.disabled = false;
+            autoPickBtn.disabled = false;
+            clearBtn.disabled = false;
+            riskSelect.disabled = false;
+            betInput.disabled = false;
+        }
+
+        // Event Listeners
+        betBtn.addEventListener('click', playKeno);
+        autoPickBtn.addEventListener('click', autoPick);
+        clearBtn.addEventListener('click', clearTable);
+        riskSelect.addEventListener('change', () => {
+            resetGridVisuals();
+            renderPayouts();
+        });
+
+        // Init
+        buildGrid();
+        renderPayouts();
+    </script>
+</body>
+</html>
