@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Aether Grid - WebGL Tower Defense</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0a0a11; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        canvas { display: block; }
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; color: white; padding: 20px; box-sizing: border-box; display: none; }
+        
+        #main-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 17, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; color: white; }
+        #main-menu h1 { font-size: 48px; color: #00ffcc; text-shadow: 0 0 20px #00ffcc; margin-bottom: 40px; }
+        .map-grid { display: flex; gap: 20px; }
+        .map-card { background: #222; border: 2px solid #555; padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; width: 160px; transition: 0.3s; }
+        .map-card:hover { background: #333; border-color: #00ffcc; transform: translateY(-5px); }
+        .map-card h2 { margin: 0 0 10px 0; font-size: 20px; color: #fff; }
+        .map-icon { font-size: 40px; margin-bottom: 10px; }
+
+        .panel { background: rgba(0,0,0,0.85); padding: 15px; border-radius: 8px; pointer-events: auto; border: 1px solid #444; box-shadow: 0 4px 15px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
+        .stats { display: flex; gap: 20px; }
+        .currency { color: #ffd700; }
+        .lives { color: #ff4444; }
+        .wave { color: #00ffcc; }
+        
+        .speed-controls { display: flex; gap: 5px; pointer-events: auto; }
+        .spd-btn { background: #222; color: white; border: 2px solid #555; padding: 5px 15px; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        .spd-btn.active { background: #00ffcc; color: black; border-color: #00ffcc; }
+
+        #build-panel { position: absolute; top: 80px; left: 20px; width: 440px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 40px; max-height: 80vh; overflow-y: auto; }
+        #build-header { position: absolute; top: 15px; left: 15px; font-size: 16px; font-weight: bold; grid-column: span 2; }
+        
+        #upgrade-panel { position: absolute; bottom: 20px; left: 20px; width: 300px; display: none; }
+        
+        #ability-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; pointer-events: auto; }
+        .ability-btn { position: relative; width: 60px; height: 60px; background: #331155; border: 2px solid #aa00ff; border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 30px; overflow: hidden; box-shadow: 0 0 10px #aa00ff; transition: 0.2s; }
+        .ability-btn:hover { background: #551188; transform: scale(1.1); }
+        .cooldown-overlay { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: rgba(0,0,0,0.7); pointer-events: none; }
+
+        .btn { display: block; width: 100%; padding: 10px; background: #222; color: white; border: 2px solid #555; cursor: pointer; font-weight: bold; transition: 0.2s; border-radius: 4px; text-align: left; }
+        .btn:hover { background: #333; border-color: #888; }
+        .btn:disabled { background: #111; color: #444; border-color: #222; cursor: not-allowed; }
+        .btn.active { background: #00ffcc; color: black; border-color: #00ffcc; }
+        .btn.remove-mode { background: #880000; border-color: #ff0000; color: white; }
+        
+        #btn-paragon { display: none; background: #ffffff; color: #000; border-color: #ffd700; text-align: center; font-size: 16px; margin-top: 10px; text-transform: uppercase; font-weight: 900; box-shadow: 0 0 15px #ffffff; }
+        #btn-paragon:hover { background: #dddddd; }
+
+        #btn-sell { background: #660000; border-color: #ff4444; text-align: center; margin-top: 10px; }
+        #btn-sell:hover { background: #990000; }
+
+        .tower-info { font-size: 10px; color: #aaa; margin-top: 4px; font-weight: normal; }
+        .path-label { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        #tower-name { font-size: 20px; margin-bottom: 5px; color: #00ffcc; text-transform: uppercase; font-weight: 900;}
+        
+        .instruction { position: absolute; top: 80px; right: 20px; font-size: 13px; color: #ccc; text-align: right; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; border: 1px solid #333;}
+        
+        #wave-announcer { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; font-weight: 900; color: #fff; text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc; opacity: 0; pointer-events: none; transition: opacity 0.5s ease-in-out; z-index: 1000; }
+
+        .floating-text { position: absolute; font-size: 22px; font-weight: 900; pointer-events: none; transform: translate(-50%, -50%); text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; z-index: 1000; animation: floatUp 1.2s ease-out forwards; }
+        @keyframes floatUp { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; } 15% { transform: translate(-50%, -80%) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -200%) scale(1); opacity: 0; } }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <!-- MAP SELECTION MENU -->
+    <div id="main-menu">
+        <h1>AETHER GRID DEFENSE</h1>
+        <div class="map-grid">
+            <div class="map-card" onclick="startGame(0)"><div class="map-icon">🌲</div><h2>Forest</h2><div style="font-size:12px; color:#aaa;">Classic Winding Path</div></div>
+            <div class="map-card" onclick="startGame(1)"><div class="map-icon">🌵</div><h2>Desert</h2><div style="font-size:12px; color:#aaa;">Long Spiral Track</div></div>
+            <div class="map-card" onclick="startGame(2)"><div class="map-icon">❄️</div><h2>Tundra</h2><div style="font-size:12px; color:#aaa;">Z-Shape River</div></div>
+            <div class="map-card" onclick="startGame(3)"><div class="map-icon">🌋</div><h2>Volcano</h2><div style="font-size:12px; color:#aaa;">Harsh Zig-Zag</div></div>
+            <div class="map-card" onclick="startGame(4)"><div class="map-icon">🏙️</div><h2>City</h2><div style="font-size:12px; color:#aaa;">Detailed Roof Placement</div></div>
+        </div>
+    </div>
+
+    <!-- GAME UI -->
+    <div id="ui-layer">
+        <div class="top-bar">
+            <div class="stats">
+                <div class="currency">Credits: $<span id="money-display">1200</span></div>
+                <div class="lives">Lives: <span id="lives-display">40</span></div>
+            </div>
+            <div class="speed-controls">
+                <button class="spd-btn active" id="spd-1" onclick="setSpeed(1)">1x</button>
+                <button class="spd-btn" id="spd-2" onclick="setSpeed(2)">2x</button>
+                <button class="spd-btn" id="spd-3" onclick="setSpeed(3)">3x</button>
+                <button class="spd-btn" id="spd-4" onclick="setSpeed(4)">4x</button>
+            </div>
+            <div class="wave">Wave: <span id="wave-display">1</span> / 30</div>
+        </div>
+
+        <div id="wave-announcer">WAVE 1</div>
+
+        <div class="panel" id="build-panel">
+            <div id="build-header">Tactical Arsenal</div>
+            <button class="btn build-btn" id="btn-build-basic" onclick="toggleBuildMode('basic')">Basic ($300)<div class="tower-info">Ability: 🚀 Orbital Strike</div></button>
+            <button class="btn build-btn" id="btn-build-rapid" onclick="toggleBuildMode('rapid')">Rapid ($400)<div class="tower-info">Ability: ⚡ Overdrive</div></button>
+            <button class="btn build-btn" id="btn-build-sniper" onclick="toggleBuildMode('sniper')">Sniper ($600)<div class="tower-info">Ability: 🎯 Assassinate</div></button>
+            <button class="btn build-btn" id="btn-build-cannon" onclick="toggleBuildMode('cannon')">Cannon ($600)<div class="tower-info">Splash DMG | Pops Leads</div></button>
+            <button class="btn build-btn" id="btn-build-frost" onclick="toggleBuildMode('frost')">Frost ($500)<div class="tower-info">Slows enemy speed</div></button>
+            <button class="btn build-btn" id="btn-build-poison" onclick="toggleBuildMode('poison')">Poison ($600)<div class="tower-info">Damage over time | Pops Leads</div></button>
+            <button class="btn build-btn" id="btn-build-laser" onclick="toggleBuildMode('laser')">Laser ($1200)<div class="tower-info">High Damage | Pops Leads</div></button>
+            <button class="btn build-btn" id="btn-build-village" onclick="toggleBuildMode('village')">Village ($800)<div class="tower-info">Buffs ATK SPD | Grants Camo</div></button>
+            <button class="btn build-btn" id="btn-build-bank" onclick="toggleBuildMode('bank')">Bank ($1000)<div class="tower-info">Income | Ability: 💰 Stimulus</div></button>
+            <button class="btn" id="btn-remove-scenery" style="grid-column: span 2; margin-top: 10px;" onclick="toggleRemoveMode()">Bulldoze Scenery ($100)</button>
+        </div>
+
+        <div class="panel" id="upgrade-panel">
+            <div id="tower-name">Base Tower</div>
+            <div id="tower-stats" style="font-size: 12px; margin-bottom:10px; color:#aaa;">DMG: 2 | SPD: 1.0/s | RNG: 4</div>
+            <button class="btn" id="btn-path1" onclick="upgradeSelectedTower(0)">
+                <div class="path-label"><span style="color:#ff4444">Upgrade Damage (T5=Ability)</span> <span id="tier1-display">0/5</span></div>
+                <div style="font-size: 11px; color: #aaa;">Cost: $<span id="cost1-display">200</span></div>
+            </button>
+            <button class="btn" id="btn-path2" onclick="upgradeSelectedTower(1)">
+                <div class="path-label"><span style="color:#ffcc00">Upgrade Speed</span> <span id="tier2-display">0/5</span></div>
+                <div style="font-size: 11px; color: #aaa;">Cost: $<span id="cost2-display">150</span></div>
+            </button>
+            <button class="btn" id="btn-path3" onclick="upgradeSelectedTower(2)">
+                <div class="path-label"><span style="color:#00aaff">Upgrade Range</span> <span id="tier3-display">0/5</span></div>
+                <div style="font-size: 11px; color: #aaa;">Cost: $<span id="cost3-display">100</span></div>
+            </button>
+            
+            <button class="btn" id="btn-paragon" onclick="ascendToParagon()">Ascend Paragon ($15000)</button>
+            <button class="btn" id="btn-sell" onclick="sellTower()">Sell for $0</button>
+        </div>
+        
+        <div id="ability-bar"></div>
+
+        <div class="instruction">
+            <strong>Controls:</strong><br>
+            <span style="color:#fff;">Right-Click + Drag:</span> Pan Camera<br>
+            <span style="color:#fff;">Shift + Left-Click + Drag:</span> Rotate Camera<br>
+            <span style="color:#fff;">Roof Placement:</span> Build ON buildings!<br><br>
+            <strong>Enemy Intel:</strong><br>
+            <span style="color:#888899;">Grey Leads:</span> Need Cannons/Poison/Laser!<br>
+            <span style="color:#b06030;">Ceramics:</span> Have thick HP shells.<br>
+            <span style="color:#ff0044;">Red Halos:</span> Regrows health if ignored!<br>
+            <span style="color:#aaaaaa;">Ghosts (Camo):</span> Need a Village to see!
+        </div>
+    </div>
+
+<script>
+/**
+ * AAA TOWER DEFENSE - WebGL
+ * ULTIMATE UPDATE: High Fidelity Procedural City, Advanced Raycasting, Full Architecture
+ */
+
+let gameStarted = false;
+let obstacleMeshes = [];
+
+// --- 0. CACHING & PROCEDURAL TEXTURES ---
+function createBuildingMaterial(baseColor, windowLitColor, windowDarkColor) {
+    let c = document.createElement('canvas'); c.width = 256; c.height = 256; 
+    let ctx = c.getContext('2d');
+    ctx.fillStyle = baseColor; ctx.fillRect(0, 0, 256, 256);
+    
+    let cols = 6; let rows = 8;
+    let wWidth = 20; let wHeight = 24;
+    let gapX = (256 - (cols * wWidth)) / (cols + 1);
+    let gapY = (256 - (rows * wHeight)) / (rows + 1);
+    
+    for (let r = 0; r < rows; r++) {
+        for (let cCol = 0; cCol < cols; cCol++) {
+            let x = gapX + cCol * (wWidth + gapX);
+            let y = gapY + r * (wHeight + gapY);
+            
+            ctx.fillStyle = (Math.random() < 0.3) ? windowLitColor : windowDarkColor;
+            ctx.fillRect(x, y, wWidth, wHeight);
+            
+            ctx.strokeStyle = '#050505'; ctx.lineWidth = 2; ctx.strokeRect(x, y, wWidth, wHeight);
+            ctx.beginPath(); ctx.moveTo(x + wWidth/2, y); ctx.lineTo(x + wWidth/2, y + wHeight);
+            ctx.moveTo(x, y + wHeight/2); ctx.lineTo(x + wWidth, y + wHeight/2); ctx.stroke();
+        }
+    }
+    
+    let tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 4;
+    return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0.3 });
+}
+
+const GeoCache = {
+    dodecahedron: new THREE.DodecahedronGeometry(1),
+    sphere: new THREE.SphereGeometry(1, 16, 16),
+    box: new THREE.BoxGeometry(1, 1, 1),
+    shield: new THREE.BoxGeometry(1.2, 1.2, 1.2),
+    regrowAura: new THREE.TorusGeometry(1, 0.05, 8, 16),
+    healthPlane: new THREE.PlaneGeometry(1.0, 0.15),
+    coin: new THREE.CylinderGeometry(0.15, 0.15, 0.05, 8),
+    cone: new THREE.ConeGeometry(0.5, 2, 8),
+    cylinder: new THREE.CylinderGeometry(0.2, 0.2, 1, 8),
+    rock: new THREE.DodecahedronGeometry(0.8)
+};
+
+const MatCache = {
+    whiteFlash: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x888888 }),
+    shield: new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }),
+    regrowAura: new THREE.MeshBasicMaterial({ color: 0xff0044 }),
+    healthBg: new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false }),
+    healthGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false }),
+    healthYellow: new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false }),
+    healthRed: new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false }),
+    paragon: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 }),
+    coin: new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 }),
+    
+    treeGreen: new THREE.MeshStandardMaterial({ color: 0x228822 }),
+    treeTrunk: new THREE.MeshStandardMaterial({ color: 0x553311 }),
+    cactus: new THREE.MeshStandardMaterial({ color: 0x44aa44 }),
+    ice: new THREE.MeshStandardMaterial({ color: 0xaaddff, transparent: true, opacity: 0.8 }),
+    rock: new THREE.MeshStandardMaterial({ color: 0x666666 }),
+    lava: new THREE.MeshBasicMaterial({ color: 0xff3300 }),
+    marble: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 }),
+    bankRoof: new THREE.MeshStandardMaterial({ color: 0x114488 }),
+    wood: new THREE.MeshStandardMaterial({ color: 0x664422 }),
+    leaf: new THREE.MeshStandardMaterial({ color: 0x339933 }),
+    
+    cityRoof: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1.0 }),
+    acUnit: new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5, roughness: 0.5 }),
+    b1: createBuildingMaterial('#2c2c35', '#ccffff', '#11111a'), // Modern Glass
+    b2: createBuildingMaterial('#4a3b32', '#ffddaa', '#1a1510'), // Brown Brick
+    b3: createBuildingMaterial('#404040', '#ffffff', '#111111'), // Dark Office
+    b4: createBuildingMaterial('#666666', '#aaddff', '#222222')  // Concrete Tower
+};
+
+const EnemyMatCache = {}; const CamoMatCache = {};
+const explosionPool = [];
+function createExplosion(pos) {
+    let exp = explosionPool.find(e => !e.active);
+    if (!exp) {
+        exp = { mesh: new THREE.Mesh(new THREE.SphereGeometry(2.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true })), active: false, timer: 0 };
+        scene.add(exp.mesh); explosionPool.push(exp);
+    }
+    exp.mesh.position.copy(pos); exp.mesh.scale.setScalar(1); exp.mesh.material.opacity = 0.8;
+    exp.mesh.visible = true; exp.active = true; exp.timer = 0.3; 
+}
+function updateExplosions(dt) {
+    for (let e of explosionPool) {
+        if (e.active) { e.timer -= dt; e.mesh.scale.multiplyScalar(1 - (dt * 2.5)); e.mesh.material.opacity -= dt * 2.5; if (e.timer <= 0) { e.active = false; e.mesh.visible = false; } }
+    }
+}
+
+const coinPool = [];
+function spawnBankCoins(pos) {
+    for(let i=0; i<8; i++) {
+        let c = coinPool.find(x => !x.active);
+        if (!c) {
+            c = { mesh: new THREE.Mesh(GeoCache.coin, MatCache.coin), active: false, vel: new THREE.Vector3() };
+            c.mesh.rotation.x = Math.PI/2; scene.add(c.mesh); coinPool.push(c);
+        }
+        c.mesh.position.copy(pos); c.mesh.position.y += 0.8;
+        c.vel.set((Math.random()-0.5)*4, Math.random()*5 + 3, (Math.random()-0.5)*4);
+        c.active = true; c.timer = 1.2; c.mesh.visible = true;
+    }
+}
+function updateCoins(dt) {
+    for (let c of coinPool) {
+        if (c.active) {
+            c.timer -= dt; c.vel.y -= 15 * dt; c.mesh.position.addScaledVector(c.vel, dt);
+            c.mesh.rotation.y += dt * 10; c.mesh.rotation.x += dt * 5;
+            if (c.timer <= 0 || c.mesh.position.y < 0) { c.active = false; c.mesh.visible = false; }
+        }
+    }
+}
+
+// --- 1. GAME SETTINGS & UI ---
+let gameSpeed = 1.0;
+function setSpeed(spd) {
+    gameSpeed = spd;
+    document.querySelectorAll('.spd-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`spd-${spd}`).classList.add('active');
+}
+
+function showFloatingText(text, position3D, color) {
+    const vector = position3D.clone(); vector.y += 1.5; vector.project(camera);
+    const x = (vector.x * 0.5 + 0.5) * window.innerWidth; const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+    const el = document.createElement('div'); el.className = 'floating-text'; el.innerText = text;
+    el.style.left = `${x}px`; el.style.top = `${y}px`; el.style.color = color;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 1200);
+}
+
+const GameState = {
+    money: 1200, 
+    lives: 40,
+    wave: 1,
+    maxWaves: 30,
+    isGameOver: false,
+    spend: function(amount) {
+        if (this.money >= amount) { this.money -= amount; document.getElementById('money-display').innerText = Math.floor(this.money); return true; }
+        return false;
+    },
+    addMoney: function(amount) { this.money += amount; document.getElementById('money-display').innerText = Math.floor(this.money); },
+    takeDamage: function(amount) {
+        if (this.isGameOver) return;
+        this.lives -= amount; document.getElementById('lives-display').innerText = this.lives;
+        if(this.lives <= 0) {
+            this.isGameOver = true;
+            const ann = document.getElementById('wave-announcer');
+            ann.innerText = "GAME OVER"; ann.style.color = "#ff0000"; ann.style.opacity = 1;
+        }
+    },
+    win: function() {
+        this.isGameOver = true;
+        const ann = document.getElementById('wave-announcer');
+        ann.innerText = "VICTORY!"; ann.style.color = "#ffd700"; ann.style.opacity = 1;
+    }
+};
+
+const ENEMY_TIERS = {
+    1: { name: 'Red',    color: 0xff4444, hp: 1,  spd: 3.0, child: null, count: 0, reward: 2, size: 0.3 },
+    2: { name: 'Blue',   color: 0x4444ff, hp: 1,  spd: 3.5, child: 1,    count: 1, reward: 2, size: 0.35 },
+    3: { name: 'Green',  color: 0x44ff44, hp: 1,  spd: 4.0, child: 2,    count: 1, reward: 2, size: 0.4 },
+    4: { name: 'Yellow', color: 0xffff44, hp: 1,  spd: 6.0, child: 3,    count: 1, reward: 3, size: 0.4 },
+    5: { name: 'Pink',   color: 0xff44ff, hp: 1,  spd: 7.5, child: 4,    count: 1, reward: 4, size: 0.4 },
+    6: { name: 'Black',  color: 0x222222, hp: 1,  spd: 3.5, child: 5,    count: 2, reward: 5, size: 0.45 },
+    7: { name: 'Lead',   color: 0x888899, hp: 1,  spd: 2.5, child: 6,    count: 2, reward: 6, size: 0.45, isLead: true },
+    8: { name: 'Zebra',  color: 0xffffff, hp: 1,  spd: 3.5, child: 6,    count: 2, reward: 5, size: 0.45 },
+    9: { name: 'Rainbow',color: 0x00ffff, hp: 1,  spd: 5.0, child: 8,    count: 2, reward: 8, size: 0.5 },
+    10:{ name: 'Ceramic',color: 0xb06030, hp: 10, spd: 4.5, child: 9,    count: 2, reward: 15,size: 0.55 },
+    11:{ name: 'MOAB',   color: 0x00aaff, hp: 200,spd: 1.5, child: 10,   count: 4, reward: 100,size: 2.0, isBoss: true },
+    12:{ name: 'BFB',    color: 0xff0000, hp: 700,spd: 1.0, child: 11,   count: 4, reward: 300,size: 3.0, isBoss: true },
+    13:{ name: 'ZOMG',   color: 0x00ff00, hp: 4000,spd: 0.8,child: 12,   count: 4, reward: 1000,size: 4.0, isBoss: true },
+    14:{ name: 'BAD',    color: 0x8800ff, hp: 20000,spd:0.7,child: 13,   count: 2, reward: 3000,size: 5.0, isBoss: true }
+};
+
+for(let tier in ENEMY_TIERS) {
+    let def = ENEMY_TIERS[tier];
+    if(def.isLead) {
+        EnemyMatCache[tier] = new THREE.MeshStandardMaterial({ color: def.color, metalness: 0.8, roughness: 0.2 });
+        CamoMatCache[tier] = new THREE.MeshStandardMaterial({ color: def.color, metalness: 0.8, roughness: 0.2, transparent: true, opacity: 0.4 });
+    } else if (def.isCeramic) {
+        EnemyMatCache[tier] = new THREE.MeshStandardMaterial({ color: def.color, roughness: 1.0 });
+        CamoMatCache[tier] = new THREE.MeshStandardMaterial({ color: def.color, roughness: 1.0, transparent: true, opacity: 0.4 });
+    } else {
+        EnemyMatCache[tier] = new THREE.MeshStandardMaterial({ color: def.color });
+        CamoMatCache[tier] = new THREE.MeshStandardMaterial({ color: def.color, transparent: true, opacity: 0.4 });
+    }
+}
+
+const TOWER_TYPES = {
+    'basic':  { name: 'Basic Tower',  cost: 300,  dmg: 2,  rng: 4.5, spd: 1.5, color: 0x888888, type: 'normal', popsLead: false, icon: '🚀' },
+    'rapid':  { name: 'Rapid Tower',  cost: 400,  dmg: 1,  rng: 3.0, spd: 5.0, color: 0x2266cc, type: 'normal', popsLead: false, icon: '⚡' },
+    'sniper': { name: 'Sniper Tower', cost: 600,  dmg: 15, rng: 15.0,spd: 0.3, color: 0x228822, type: 'normal', popsLead: false, icon: '🎯' },
+    'cannon': { name: 'Cannon Tower', cost: 600,  dmg: 8,  rng: 4.0, spd: 0.5, color: 0xcc5500, type: 'splash', popsLead: true,  icon: '☢️' },
+    'frost':  { name: 'Frost Tower',  cost: 500,  dmg: 1,  rng: 3.5, spd: 1.0, color: 0x00aaff, type: 'slow',   popsLead: false, icon: '❄️' },
+    'poison': { name: 'Poison Tower', cost: 600,  dmg: 1,  rng: 4.0, spd: 1.0, color: 0x55aa22, type: 'dot',    popsLead: true,  icon: '🧪' },
+    'laser':  { name: 'Laser Tower',  cost: 1200, dmg: 4,  rng: 5.0, spd: 8.0, color: 0xaa22aa, type: 'normal', popsLead: true,  icon: '🔮' },
+    'village':{ name: 'Village Hut',  cost: 800,  dmg: 0,  rng: 5.0, spd: 0.0, color: 0x775533, type: 'buff',   popsLead: false, icon: '🏕️' },
+    'bank':   { name: 'Bank Vault',   cost: 1000, dmg: 0,  rng: 0.0, spd: 0.1, color: 0xffd700, type: 'income', popsLead: false, icon: '💰' } 
+};
+
+// --- 3. SCENE, CAMERA CONTROLS & MAP ---
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0a11);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.9); dirLight.position.set(10, 20, 10); scene.add(dirLight);
+
+const gridHelper = new THREE.GridHelper(36, 36, 0x223322, 0x1a2a1a); gridHelper.position.y = 0.01; scene.add(gridHelper);
+const groundPlane = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshStandardMaterial({ color: 0x111a11 })); 
+groundPlane.rotation.x = -Math.PI / 2; scene.add(groundPlane);
+
+// Camera Controller
+let camTheta = Math.PI / 2; let camPhi = Math.PI / 3; let camRadius = 26;
+let camTarget = new THREE.Vector3(0, 0, 0);
+let isPanning = false; let isOrbiting = false; let prevMouseX = 0; let prevMouseY = 0;
+
+function updateCamera() {
+    camPhi = Math.max(0.1, Math.min(Math.PI / 2.1, camPhi)); 
+    camera.position.x = camTarget.x + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+    camera.position.y = camTarget.y + camRadius * Math.cos(camPhi);
+    camera.position.z = camTarget.z + camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+    camera.lookAt(camTarget);
+}
+updateCamera();
+
+window.addEventListener('mousedown', e => {
+    if(!gameStarted || (e.target.closest('#ui-layer') && e.target.tagName !== 'CANVAS')) return;
+    if (e.button === 2) { isPanning = true; prevMouseX = e.clientX; prevMouseY = e.clientY; }
+    if (e.button === 0 && e.shiftKey) { isOrbiting = true; prevMouseX = e.clientX; prevMouseY = e.clientY; }
+});
+window.addEventListener('mousemove', e => {
+    if (!gameStarted) return;
+    let dx = e.clientX - prevMouseX; let dy = e.clientY - prevMouseY;
+    prevMouseX = e.clientX; prevMouseY = e.clientY;
+    if (isPanning) {
+        let right = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion); right.y = 0; right.normalize();
+        let forward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion); forward.y = 0; forward.normalize();
+        camTarget.addScaledVector(right, -dx * 0.05); camTarget.addScaledVector(forward, dy * 0.05);
+        updateCamera();
+    }
+    if (isOrbiting) { camTheta -= dx * 0.01; camPhi -= dy * 0.01; updateCamera(); }
+});
+window.addEventListener('mouseup', () => { isPanning = false; isOrbiting = false; });
+window.addEventListener('contextmenu', e => e.preventDefault()); 
+
+let pathPoints = [];
+const pathGroup = new THREE.Group(); scene.add(pathGroup);
+const sceneryGroup = new THREE.Group(); scene.add(sceneryGroup);
+
+let startPortal = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.2, 16, 32), new THREE.MeshBasicMaterial({color: 0x00ff00})); scene.add(startPortal);
+let endCore = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5), new THREE.MeshBasicMaterial({color: 0xff0044, wireframe: true})); scene.add(endCore);
+
+const MAPS = [
+    {   // 0: Forest Snake
+        ground: 0x113311, pathColor: 0x4a3219, bg: 0x87CEEB,
+        pts: [ [-14,-8], [-4,-8], [-4,4], [-10,4], [-10,10], [8,10], [8,-2], [2,-2], [2,-10], [14,-10] ],
+        scenery: (x,z) => {
+            if(Math.random() < 0.3) {
+                let m = new THREE.Mesh(GeoCache.cone, MatCache.treeGreen); m.position.set(x, 1, z); sceneryGroup.add(m); obstacleMeshes.push(m);
+                let t = new THREE.Mesh(GeoCache.cylinder, MatCache.treeTrunk); t.position.set(x, 0.5, z); sceneryGroup.add(t);
+            }
+        }
+    },
+    {   // 1: Desert Spiral
+        ground: 0xddaa77, pathColor: 0xbb8855, bg: 0xffcc88,
+        pts: [ [-14,-10], [10,-10], [10,8], [-8,8], [-8,-6], [6,-6], [6,4], [-4,4], [-4,-2], [2,-2] ],
+        scenery: (x,z) => {
+            if(Math.random() < 0.2) {
+                let m = new THREE.Mesh(GeoCache.cylinder, MatCache.cactus); m.scale.set(1,2,1); m.position.set(x, 1, z); sceneryGroup.add(m); obstacleMeshes.push(m);
+            } else if(Math.random() < 0.1) {
+                let m = new THREE.Mesh(GeoCache.rock, MatCache.rock); m.position.set(x, 0.4, z); sceneryGroup.add(m); obstacleMeshes.push(m);
+            }
+        }
+    },
+    {   // 2: Tundra Z
+        ground: 0xddddff, pathColor: 0x88aaff, bg: 0x111122,
+        pts: [ [-14, 8], [-4, 8], [-4, 0], [4, 0], [4, -8], [14, -8] ],
+        scenery: (x,z) => {
+            if(Math.random() < 0.25) {
+                let m = new THREE.Mesh(GeoCache.cone, MatCache.ice); m.scale.set(0.5, 1+Math.random(), 0.5); m.position.set(x, 1, z); sceneryGroup.add(m); obstacleMeshes.push(m);
+            }
+        }
+    },
+    {   // 3: Volcano
+        ground: 0x221111, pathColor: 0x111111, bg: 0x440000,
+        pts: [ [-12, 12], [0, 12], [0, 0], [-10, 0], [-10, -8], [12, -8], [12,2], [14,2] ],
+        scenery: (x,z) => {
+            if(Math.random() < 0.3) {
+                let m = new THREE.Mesh(GeoCache.box, MatCache.lava); m.position.set(x, 0.02, z); m.scale.set(1.9, 0.1, 1.9); sceneryGroup.add(m);
+            } else if(Math.random() < 0.1) {
+                let m = new THREE.Mesh(GeoCache.rock, MatCache.rock); m.position.set(x, 0.5, z); m.scale.setScalar(1.5); sceneryGroup.add(m); obstacleMeshes.push(m);
+            }
+        }
+    },
+    {   // 4: City Blocks (Procedural Architecture)
+        ground: 0x333333, pathColor: 0x111111, bg: 0x050511,
+        pts: [ [-10, -14], [-10, -4], [8, -4], [8, 6], [-2, 6], [-2, 14] ],
+        scenery: (x,z) => {
+            if(Math.random() < 0.5) { // City density
+                let h = 2 + Math.floor(Math.random()*4); // Heights 2, 3, 4, 5
+                let mats = [MatCache.b1, MatCache.b2, MatCache.b3, MatCache.b4];
+                let wallMat = mats[Math.floor(Math.random() * mats.length)];
+                
+                let geo = new THREE.BoxGeometry(1.8, h, 1.8);
+                const uvs = geo.attributes.uv;
+                for(let i=0; i<uvs.count; i++) {
+                    let ny = Math.abs(geo.attributes.normal.getY(i));
+                    if (ny < 0.5) uvs.setY(i, uvs.getY(i) * (h/2)); // Scale UVs on walls only
+                }
+                
+                let bldgGroup = new THREE.Group(); bldgGroup.position.set(x, 0, z);
+                
+                // Walls and Roof array
+                let m = new THREE.Mesh(geo, [wallMat, wallMat, MatCache.cityRoof, MatCache.cityRoof, wallMat, wallMat]);
+                m.position.y = h/2; bldgGroup.add(m);
+                
+                // Roof AC Units
+                if (Math.random() < 0.7) {
+                    let ac1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), MatCache.acUnit);
+                    ac1.position.set(0.3, h + 0.15, 0.3); bldgGroup.add(ac1);
+                }
+                if (Math.random() < 0.5) {
+                    let ac2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.5), MatCache.acUnit);
+                    ac2.position.set(-0.3, h + 0.1, -0.2); bldgGroup.add(ac2);
+                }
+                
+                m.userData = { isBuilding: true, roofHeight: h, parentGroup: bldgGroup };
+                sceneryGroup.add(bldgGroup); obstacleMeshes.push(m);
+            }
+        }
+    }
+];
+
+function isPointOnPath(x, z) {
+    const pt = new THREE.Vector2(x, z);
+    for(let i=0; i<pathPoints.length-1; i++) {
+        const p1 = new THREE.Vector2(pathPoints[i].x, pathPoints[i].z);
+        const p2 = new THREE.Vector2(pathPoints[i+1].x, pathPoints[i+1].z);
+        const l2 = p1.distanceToSquared(p2);
+        if (l2 === 0) continue;
+        let t = Math.max(0, Math.min(1, ((pt.x - p1.x) * (p2.x - p1.x) + (pt.y - p1.y) * (p2.y - p1.y)) / l2));
+        const projection = new THREE.Vector2(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y));
+        if (pt.distanceToSquared(projection) <= 2.25) return true; 
+    }
+    return false;
+}
+
+// True Line of Sight Checker
+const losRaycaster = new THREE.Raycaster();
+function checkLineOfSight(startVec, endVec) {
+    let dir = new THREE.Vector3().subVectors(endVec, startVec);
+    let dist = dir.length(); dir.normalize();
+    losRaycaster.set(startVec, dir);
+    let hits = losRaycaster.intersectObjects(obstacleMeshes);
+    for (let hit of hits) {
+        if (hit.distance < 1.0) continue; // Ignore the roof we are sitting immediately on
+        if (hit.distance < dist) return false;
+    }
+    return true;
+}
+
+function startGame(mapIndex) {
+    document.getElementById('main-menu').style.display = 'none';
+    document.getElementById('ui-layer').style.display = 'block';
+    
+    const mapDef = MAPS[mapIndex];
+    groundPlane.material.color.setHex(mapDef.ground);
+    scene.background.setHex(mapDef.bg);
+    
+    pathPoints = mapDef.pts.map(p => new THREE.Vector3(p[0], 0.5, p[1]));
+    
+    const dirtMat = new THREE.MeshStandardMaterial({ color: mapDef.pathColor, roughness: 1.0 });
+    for(let i=0; i<pathPoints.length-1; i++) {
+        const p1 = pathPoints[i]; const p2 = pathPoints[i+1];
+        const dist = p1.distanceTo(p2); const center = p1.clone().lerp(p2, 0.5);
+        const segment = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, dist), dirtMat);
+        segment.position.copy(center); segment.position.y = 0.05; segment.lookAt(p2);
+        pathGroup.add(segment);
+    }
+    for(let i=0; i<pathPoints.length; i++) {
+        const joint = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.11, 16), dirtMat);
+        joint.position.copy(pathPoints[i]); joint.position.y = 0.05; pathGroup.add(joint);
+    }
+    
+    startPortal.position.copy(pathPoints[0]); startPortal.position.y = 1.2;
+    endCore.position.copy(pathPoints[pathPoints.length-1]); endCore.position.y = 1.5;
+
+    for(let x=-16; x<=16; x+=2) {
+        for(let z=-16; z<=16; z+=2) {
+            if(!isPointOnPath(x, z)) mapDef.scenery(x, z);
+        }
+    }
+    
+    gameStarted = true;
+    setTimeout(() => WaveManager.startWave(), 2000);
+}
+
+// --- 4. ENEMY SYSTEM ---
+const enemies = [];
+class Enemy {
+    constructor(tier, startProgress = 0, isRegrow = false, originalTier = null, isCamo = false) {
+        this.active = true; this.tierId = tier; const def = ENEMY_TIERS[tier];
+        this.isBoss = def.isBoss || false; this.isLead = def.isLead || false;
+        this.isCeramic = tier === 10; this.isCamo = isCamo;
+        this.maxHp = def.hp; this.hp = this.maxHp;
+        this.speed = def.spd; this.reward = def.reward;
+        this.childTier = def.child; this.childCount = def.count;
+        this.isRegrow = isRegrow; this.maxTierId = originalTier || tier;
+        this.timeSinceLastHit = 0; this.hitFlashTimer = 0; 
+
+        this.progress = startProgress; this.totalPathLength = 0; this.segmentLengths = [];
+        for(let i=0; i<pathPoints.length-1; i++) {
+            let l = pathPoints[i].distanceTo(pathPoints[i+1]);
+            this.segmentLengths.push(l); this.totalPathLength += l;
+        }
+
+        this.group = new THREE.Group(); this.updatePosition();
+        this.speedMod = 1.0; this.slowTimer = 0; this.poisonTicks = 0; this.poisonTimer = 0;
+        
+        let geo = def.isBoss ? GeoCache.box : (def.isLead ? GeoCache.sphere : GeoCache.dodecahedron);
+        this.mesh = new THREE.Mesh(geo, this.isCamo ? CamoMatCache[tier] : EnemyMatCache[tier]);
+        this.mesh.scale.setScalar(def.size); this.group.add(this.mesh);
+
+        if (this.isBoss) {
+            this.shield = new THREE.Mesh(GeoCache.shield, MatCache.shield); this.shield.scale.setScalar(def.size);
+            if(this.isCamo) { this.shield.material.transparent = true; this.shield.material.opacity = 0.4; }
+            this.group.add(this.shield);
+        }
+        if (this.isRegrow) {
+            this.regrowAura = new THREE.Mesh(GeoCache.regrowAura, MatCache.regrowAura);
+            this.regrowAura.rotation.x = Math.PI/2; this.regrowAura.scale.setScalar(def.size * 1.5);
+            this.group.add(this.regrowAura);
+        }
+
+        this.healthGroup = new THREE.Group();
+        this.healthGroup.position.y = this.isBoss ? (def.size + 0.5) : 0.8;
+        const bgBar = new THREE.Mesh(GeoCache.healthPlane, MatCache.healthBg); bgBar.position.z = -0.01;
+        this.healthBar = new THREE.Mesh(GeoCache.healthPlane, MatCache.healthGreen);
+        this.healthGroup.add(bgBar); this.healthGroup.add(this.healthBar);
+        this.group.add(this.healthGroup); scene.add(this.group);
+    }
+
+    updatePosition() {
+        let remaining = this.progress;
+        for(let i=0; i<this.segmentLengths.length; i++) {
+            if (remaining <= this.segmentLengths[i]) {
+                const alpha = remaining / this.segmentLengths[i];
+                this.group.position.lerpVectors(pathPoints[i], pathPoints[i+1], alpha);
+                return;
+            }
+            remaining -= this.segmentLengths[i];
+        }
+        this.destroy(); GameState.takeDamage(this.isBoss ? 20 : (this.isCeramic ? 10 : 1));
+    }
+
+    update(dt) {
+        if (!this.active) return;
+        if (this.hitFlashTimer > 0) {
+            this.hitFlashTimer -= dt;
+            if (this.hitFlashTimer <= 0) this.mesh.material = this.isCamo ? CamoMatCache[this.tierId] : EnemyMatCache[this.tierId];
+        }
+
+        this.timeSinceLastHit += dt;
+        if (this.isRegrow && this.timeSinceLastHit > 3.0 && this.tierId < this.maxTierId) {
+            enemies.push(new Enemy(this.tierId + 1, this.progress, true, this.maxTierId, this.isCamo));
+            this.destroy(); return;
+        }
+        
+        if (this.slowTimer > 0) { this.slowTimer -= dt; if (this.slowTimer <= 0) this.speedMod = 1.0; }
+        if (this.poisonTicks > 0) {
+            this.poisonTimer -= dt;
+            if (this.poisonTimer <= 0) { this.takeDamage(1, true, true); this.poisonTicks--; this.poisonTimer = 0.5; }
+        }
+
+        if (this.isBoss) { this.shield.rotation.x += dt; this.shield.rotation.y += dt; }
+        if (this.isRegrow && this.regrowAura) this.regrowAura.rotation.z += dt * 3; 
+        this.healthGroup.lookAt(camera.position);
+
+        this.progress += (this.speed * this.speedMod) * dt; this.updatePosition();
+    }
+
+    takeDamage(amt, silent = false, bypassLead = false) {
+        if (!this.active) return;
+        this.timeSinceLastHit = 0; 
+        if (this.isLead && !bypassLead) return; 
+
+        this.hp -= amt;
+        const pct = Math.max(0, this.hp / this.maxHp);
+        this.healthBar.scale.x = Math.max(0.01, pct); this.healthBar.position.x = (pct - 1) * 0.5;
+        if (pct < 0.25) this.healthBar.material = MatCache.healthRed;
+        else if (pct < 0.5) this.healthBar.material = MatCache.healthYellow;
+        else this.healthBar.material = MatCache.healthGreen;
+
+        if (!silent) { this.mesh.material = MatCache.whiteFlash; this.hitFlashTimer = 0.05; }
+
+        if (this.hp <= 0) {
+            GameState.addMoney(this.reward); 
+            if (this.childTier) {
+                for(let i=0; i<this.childCount; i++) {
+                    enemies.push(new Enemy(this.childTier, Math.max(0, this.progress - (i * 0.4)), this.isRegrow, this.maxTierId, this.isCamo));
+                }
+            }
+            if (this.isBoss) showFloatingText(`BOSS DOWN`, this.group.position, '#00ffcc');
+            this.destroy();
+        }
+    }
+
+    destroy() { this.active = false; scene.remove(this.group); }
+}
+
+// --- WAVE MANAGER ---
+const WaveManager = {
+    waveQueue: [], spawnTimer: 0, state: 'waiting', 
+    startWave: function() {
+        if(GameState.wave > GameState.maxWaves) { GameState.win(); return; }
+        document.getElementById('wave-display').innerText = GameState.wave;
+        const ann = document.getElementById('wave-announcer');
+        ann.innerText = `WAVE ${GameState.wave}`; ann.style.opacity = 1; setTimeout(() => ann.style.opacity = 0, 2000);
+        
+        this.waveQueue = []; let w = GameState.wave;
+        let hasCamo = w >= 12; let isCamoWave = w === 15 || w === 22; 
+
+        if (w === 10) { this.waveQueue.push({ tier: 11, delay: 3.0, regrow: false, camo: false }); } 
+        else if (w === 20) { this.waveQueue.push({ tier: 12, delay: 3.0, regrow: false, camo: true }); } 
+        else if (w === 25) { this.waveQueue.push({ tier: 13, delay: 3.0, regrow: false, camo: false }); } 
+        else if (w === 30) { this.waveQueue.push({ tier: 14, delay: 3.0, regrow: false, camo: true }); } 
+        else {
+            let maxTier = Math.min(10, Math.floor(w / 2) + 1);
+            let count = 10 + (w * 5); let hasRegrow = w > 5; let hasLeads = w > 7;
+            for(let i=0; i<count; i++) {
+                let t = Math.max(1, Math.ceil(Math.random() * maxTier));
+                if (t === 7 && !hasLeads) t = 6; if (t > 10) t = 10; 
+                let isR = hasRegrow ? (Math.random() < 0.25) : false; 
+                let isC = isCamoWave ? true : (hasCamo && Math.random() < 0.2);
+                this.waveQueue.push({ tier: t, delay: Math.max(0.15, 0.8 - (w*0.02)), regrow: isR, camo: isC });
+            }
+            this.waveQueue.sort((a,b) => a.tier - b.tier); 
+        }
+        this.state = 'spawning';
+    },
+    update: function(dt) {
+        if (GameState.isGameOver) return;
+        if (this.state === 'spawning') {
+            this.spawnTimer -= dt;
+            if (this.spawnTimer <= 0 && this.waveQueue.length > 0) {
+                let next = this.waveQueue.shift();
+                enemies.push(new Enemy(next.tier, 0, next.regrow, null, next.camo));
+                this.spawnTimer = next.delay;
+            }
+            if (this.waveQueue.length === 0) this.state = 'active'; 
+        } 
+        else if (this.state === 'active') {
+            if (enemies.length === 0) {
+                this.state = 'waiting'; GameState.addMoney(300 + (GameState.wave * 50)); GameState.wave++;
+                if (GameState.wave <= GameState.maxWaves) setTimeout(() => { this.startWave(); }, 4000);
+                else GameState.win();
+            }
+        }
+    }
+};
+
+function syncGlobalAbilities() {
+    const bar = document.getElementById('ability-bar'); bar.innerHTML = ''; 
+    towers.forEach(t => {
+        if (t.hasAbility) {
+            const btn = document.createElement('div'); btn.className = 'ability-btn';
+            btn.innerHTML = `${t.icon}<div class="cooldown-overlay" id="cd-overlay-${t.id}"></div>`;
+            btn.onclick = () => t.useAbility(); bar.appendChild(btn);
+        }
+    });
+}
+function updateGlobalAbilitiesCooldowns() {
+    towers.forEach(t => {
+        if (t.hasAbility) {
+            const overlay = document.getElementById(`cd-overlay-${t.id}`);
+            if (overlay) overlay.style.height = `${(t.abilityCooldown / t.abilityMaxCooldown) * 100}%`;
+        }
+    });
+}
+
+// --- 5. TOWER SYSTEM ---
+const towers = []; let selectedTower = null; let towerIdCounter = 0;
+
+class Tower {
+    constructor(x, yOffset, z, typeId) {
+        const def = TOWER_TYPES[typeId]; this.id = towerIdCounter++;
+        this.typeId = typeId; this.name = def.name; this.damage = def.dmg; this.range = def.rng;
+        this.baseFireRate = def.spd; this.fireRate = def.spd; this.attackType = def.type;
+        this.beamColor = def.color; this.canPopLead = def.popsLead; this.icon = def.icon;
+        this.canDetectCamo = false; this.buffedSpeed = 1.0; this.buffedCamo = false;
+        this.fireCooldown = 0; this.tiers = [0, 0, 0]; this.totalSpent = def.cost;
+        this.hasAbility = false; this.abilityCooldown = 0; this.abilityMaxCooldown = 30; this.abilityActiveTimer = 0; 
+        this.isParagon = false;
+
+        this.group = new THREE.Group(); this.group.position.set(x, yOffset, z);
+        this.baseMat = new THREE.MeshStandardMaterial({ color: def.color });
+        this.turretMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        this.turretGroup = new THREE.Group(); this.barrelGroup = new THREE.Group(); this.turretGroup.add(this.barrelGroup);
+        this.muzzle = new THREE.Object3D(); 
+
+        if (typeId === 'bank') {
+            let s1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 1.2), MatCache.marble); s1.position.y = 0.05;
+            let s2 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 1.0), MatCache.marble); s2.position.y = 0.15;
+            this.group.add(s1, s2);
+            for(let cx of [-0.4, 0, 0.4]) {
+                let col = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5), MatCache.marble);
+                col.position.set(cx, 0.45, 0.35); this.group.add(col);
+            }
+            let body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 0.8), MatCache.marble); body.position.set(0, 0.45, -0.1);
+            let roof = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.4, 4), MatCache.bankRoof); roof.rotation.y = Math.PI/4; roof.position.y = 0.9;
+            this.group.add(body, roof);
+        } 
+        else if (typeId === 'village') {
+            this.baseMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.4, 8), MatCache.wood); this.baseMesh.position.y = 0.2;
+            let roof = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.5, 8), MatCache.leaf); roof.position.y = 0.65;
+            let hut2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.3, 8), MatCache.wood); hut2.position.set(0.3, 0.15, 0.3);
+            let roof2 = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.3, 8), MatCache.leaf); roof2.position.set(0.3, 0.45, 0.3);
+            this.group.add(this.baseMesh, roof, hut2, roof2);
+            
+            this.aura = new THREE.Mesh(GeoCache.regrowAura, new THREE.MeshBasicMaterial({color:0x00ffcc, transparent:true, opacity:0.3}));
+            this.aura.rotation.x = Math.PI/2; this.aura.scale.setScalar(this.range); this.group.add(this.aura);
+        }
+        else {
+            this.baseMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 1.2), this.baseMat);
+            this.baseMesh.position.y = 0.2; this.group.add(this.baseMesh);
+            this.turretGroup.position.y = 0.6;
+            
+            if (typeId === 'sniper') {
+                this.turretCore = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), this.turretMat);
+                let barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8), new THREE.MeshStandardMaterial({color:0x111111}));
+                barrel.rotation.x = Math.PI/2; barrel.position.z = 0.75;
+                let scope = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.4), new THREE.MeshStandardMaterial({color:0x000000}));
+                scope.position.set(0, 0.25, 0.2);
+                this.barrelGroup.add(barrel, scope);
+                this.muzzle.position.set(0, 0, 1.5); this.barrelGroup.add(this.muzzle);
+            }
+            else if (typeId === 'rapid') {
+                this.turretCore = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 8), this.turretMat); this.turretCore.rotation.x = Math.PI/2;
+                for(let i=0; i<4; i++) {
+                    let b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8), new THREE.MeshStandardMaterial({color:0x111111}));
+                    b.rotation.x = Math.PI/2; b.position.set(Math.cos(i*Math.PI/2)*0.15, Math.sin(i*Math.PI/2)*0.15, 0.4);
+                    this.barrelGroup.add(b);
+                }
+                this.muzzle.position.set(0, 0, 0.8); this.barrelGroup.add(this.muzzle);
+            }
+            else if (typeId === 'cannon') {
+                this.turretCore = new THREE.Mesh(GeoCache.sphere, this.turretMat); this.turretCore.scale.setScalar(0.5);
+                let barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.0, 8), new THREE.MeshStandardMaterial({color:0x111111}));
+                barrel.rotation.x = Math.PI/2; barrel.position.z = 0.5;
+                this.barrelGroup.add(barrel);
+                this.muzzle.position.set(0, 0, 1.0); this.barrelGroup.add(this.muzzle);
+            }
+            else if (typeId === 'laser') {
+                this.turretCore = new THREE.Mesh(GeoCache.sphere, this.turretMat); this.turretCore.scale.setScalar(0.4);
+                let ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 16), new THREE.MeshStandardMaterial({color:0x00ffff}));
+                ring.position.z = 0.5; this.barrelGroup.add(ring);
+                this.muzzle.position.set(0, 0, 0.5); this.barrelGroup.add(this.muzzle);
+            }
+            else {
+                this.turretCore = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 8), this.turretMat); this.turretCore.rotation.x = Math.PI/2;
+                let mainBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8), new THREE.MeshStandardMaterial({color:0x111111}));
+                mainBarrel.rotation.x = Math.PI/2; mainBarrel.position.z = 0.4; this.barrelGroup.add(mainBarrel);
+                this.muzzle.position.set(0, 0, 0.8); this.barrelGroup.add(this.muzzle);
+            }
+            this.turretGroup.add(this.turretCore); this.group.add(this.turretGroup);
+        }
+
+        this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.0, 1.5), new THREE.MeshBasicMaterial({visible: false}));
+        this.hitbox.position.y = 1.0; this.hitbox.userData = { tower: this }; this.group.add(this.hitbox);
+
+        const ringGeo = new THREE.RingGeometry(this.range - 0.1, this.range, 32);
+        this.rangeRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.3 }));
+        this.rangeRing.rotation.x = Math.PI / 2; this.rangeRing.position.y = 0.05; this.rangeRing.visible = false;
+        this.group.add(this.rangeRing);
+
+        this.beamMat = new THREE.LineBasicMaterial({ color: this.beamColor, linewidth: 3 });
+        this.beamGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+        this.beamLine = new THREE.Line(this.beamGeo, this.beamMat);
+        this.beamLine.visible = false; this.beamTimer = 0; scene.add(this.beamLine);
+        scene.add(this.group);
+    }
+
+    getSellValue() { return Math.floor(this.totalSpent * 0.75); }
+    destroy() { scene.remove(this.group); scene.remove(this.beamLine); if(this.hasAbility) syncGlobalAbilities(); }
+
+    useAbility() {
+        if (!this.hasAbility || this.abilityCooldown > 0) return;
+        this.abilityCooldown = this.isParagon ? this.abilityMaxCooldown/2 : this.abilityMaxCooldown; 
+
+        if (this.typeId === 'basic') {
+            let target = enemies.filter(e => e.active).sort((a,b) => b.hp - a.hp)[0];
+            if(target) {
+                createExplosion(target.group.position);
+                let dmg = this.isParagon ? 1000 : 100;
+                enemies.forEach(e => { if(e.active && e.group.position.distanceToSquared(target.group.position) < 16.0) e.takeDamage(dmg, false, true); });
+                showFloatingText("ORBITAL STRIKE!", target.group.position, '#ff0000');
+            }
+        }
+        else if (this.typeId === 'rapid') { this.abilityActiveTimer = 5.0; this.turretCore.material.emissive.setHex(0xffaa00); }
+        else if (this.typeId === 'sniper') {
+            let target = enemies.filter(e => e.active && (!e.isBoss || this.isParagon)).sort((a,b) => b.hp - a.hp)[0];
+            if(target) { target.takeDamage(this.isParagon ? 15000 : 9999, false, true); showFloatingText("ASSASSINATED!", target.group.position, '#ff0000'); }
+        }
+        else if (this.typeId === 'bank') {
+            let cash = this.isParagon ? 5000 : 1000; GameState.addMoney(cash); 
+            showFloatingText(`STIMULUS +$${cash}`, this.group.position, '#ffd700'); spawnBankCoins(this.group.position);
+        }
+        else if (this.typeId === 'cannon') {
+            let dmg = this.isParagon ? 500 : 20; enemies.forEach(e => { if(e.active) e.takeDamage(dmg, false, true); });
+            showFloatingText("NUKE!", new THREE.Vector3(0,5,0), '#ffaa00');
+        }
+    }
+
+    ascend() {
+        if (GameState.spend(15000)) {
+            this.isParagon = true; this.totalSpent += 15000; this.name = "PARAGON " + this.name;
+            this.damage *= 10; this.baseFireRate *= 3; this.range += 5.0; this.canPopLead = true; this.canDetectCamo = true;
+
+            if(this.typeId === 'bank' || this.typeId === 'village') {} 
+            else { this.baseMesh.material = MatCache.paragon; this.turretCore.material = MatCache.paragon; }
+            
+            this.rangeRing.geometry.dispose(); this.rangeRing.geometry = new THREE.RingGeometry(this.range - 0.1, this.range, 32);
+            showFloatingText("ASCENDED", this.group.position, '#ffffff'); updateUI();
+        }
+    }
+
+    update(dt) {
+        if (this.abilityCooldown > 0) this.abilityCooldown -= dt;
+        if (this.beamTimer > 0) { this.beamTimer -= dt; if (this.beamTimer <= 0) this.beamLine.visible = false; }
+        
+        let currentFireRate = this.baseFireRate * this.buffedSpeed;
+        if (this.abilityActiveTimer > 0) {
+            this.abilityActiveTimer -= dt; currentFireRate *= 5; 
+            if (this.abilityActiveTimer <= 0 && !this.isParagon && this.turretCore) this.turretCore.material.emissive.setHex(0x000000);
+        }
+
+        if (this.attackType === 'income') {
+            this.fireCooldown -= dt;
+            if (this.fireCooldown <= 0) {
+                const amt = (20 + (this.tiers[0] * 10)) * (this.isParagon ? 5 : 1); 
+                GameState.addMoney(amt); this.fireCooldown = 1.0 / currentFireRate;
+                spawnBankCoins(this.group.position);
+            }
+            return;
+        }
+        
+        if (this.typeId === 'village') {
+            if(this.aura) this.aura.scale.setScalar(this.range + Math.sin(Date.now() * 0.005) * 0.2); 
+            return; 
+        }
+
+        if (this.typeId === 'laser') this.barrelGroup.rotation.z += dt * 10;
+        if (this.typeId === 'rapid') this.barrelGroup.rotation.z += dt * 5;
+
+        const target = this.findTarget();
+        if (target) {
+            let lookPos = target.group.position.clone(); lookPos.y = this.turretGroup.position.y;
+            const targetQuat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(this.turretGroup.position, lookPos, new THREE.Vector3(0,1,0)));
+            this.turretGroup.quaternion.slerp(targetQuat, 10 * dt);
+
+            this.fireCooldown -= dt;
+            if (this.fireCooldown <= 0) { this.shoot(target); this.fireCooldown = 1.0 / currentFireRate; }
+        }
+    }
+
+    findTarget() {
+        let bestTarget = null; let maxProgress = -1; const rangeSq = this.range * this.range; 
+        
+        let fireOrigin = new THREE.Vector3();
+        if(this.muzzle) this.muzzle.getWorldPosition(fireOrigin);
+        else fireOrigin.copy(this.group.position).add(new THREE.Vector3(0, 1, 0));
+
+        for (let e of enemies) {
+            if (e.active) {
+                if (e.isCamo && !this.canDetectCamo && !this.buffedCamo) continue;
+                if (this.group.position.distanceToSquared(e.group.position) <= rangeSq) {
+                    if (obstacleMeshes.length > 0 && !checkLineOfSight(fireOrigin, e.group.position)) continue;
+                    if (e.progress > maxProgress) { maxProgress = e.progress; bestTarget = e; }
+                }
+            }
+        }
+        return bestTarget;
+    }
+
+    shoot(target) {
+        if (target.isLead && !this.canPopLead) return; 
+
+        let startPoint = new THREE.Vector3(); this.muzzle.getWorldPosition(startPoint);
+        const endPoint = target.group.position.clone();
+        
+        const positions = this.beamGeo.attributes.position.array;
+        positions[0] = startPoint.x; positions[1] = startPoint.y; positions[2] = startPoint.z;
+        positions[3] = endPoint.x;   positions[4] = endPoint.y;   positions[5] = endPoint.z;
+        this.beamGeo.attributes.position.needsUpdate = true;
+        this.beamLine.visible = true; this.beamTimer = 0.05; 
+        
+        if (this.attackType === 'splash') {
+            createExplosion(target.group.position);
+            enemies.forEach(e => { if (e.active && e.group.position.distanceToSquared(target.group.position) < 6.25) e.takeDamage(this.damage, false, this.canPopLead); });
+        } else if (this.attackType === 'slow') {
+            target.takeDamage(this.damage, false, this.canPopLead); target.applySlow(this.isParagon ? 0.1 : 0.4, 2.0); 
+        } else if (this.attackType === 'dot') {
+            target.takeDamage(this.damage, false, this.canPopLead); target.applyPoison(5 + this.tiers[0]*2); 
+        } else {
+            target.takeDamage(this.damage, false, this.canPopLead);
+        }
+    }
+
+    updateVisuals() {
+        if(this.typeId === 'village' || this.typeId === 'bank') return;
+        if (this.tiers[0] >= 3 && this.typeId === 'basic' && this.barrelGroup.children.length === 1) {
+            const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8), new THREE.MeshStandardMaterial({color:0x111111}));
+            b2.rotation.x = Math.PI/2; b2.position.set(-0.2, 0, 0.4);
+            const b3 = b2.clone(); b3.position.set(0.2, 0, 0.4);
+            this.barrelGroup.add(b2, b3);
+        }
+        if (this.tiers[2] >= 3 && !this.radar) {
+            this.radar = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.2, 8), new THREE.MeshStandardMaterial({color:0x00aaff}));
+            this.radar.position.set(0, 0.5, -0.2); this.radar.rotation.x = -Math.PI/4;
+            this.turretGroup.add(this.radar);
+        }
+        if (this.tiers[0] >= 5 && !this.hasAbility) {
+            this.hasAbility = true;
+            if(!this.isParagon) this.turretCore.material.color.setHex(0xaa00ff); 
+            syncGlobalAbilities();
+        }
+    }
+
+    select(isSelected) {
+        this.rangeRing.visible = isSelected;
+        if(!this.isParagon && this.baseMat && this.typeId !== 'bank' && this.typeId !== 'village') this.baseMat.emissive.setHex(isSelected ? 0x444444 : 0x000000);
+    }
+}
+
+// --- 6. PLACEMENT, GHOST PREVIEW, ROOFS & SCENERY REMOVAL ---
+const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+let placingMode = false; let removeMode = false; let selectedTowerToBuild = null;
+
+const ghostGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+const ghostMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6 });
+const ghostCursor = new THREE.Mesh(ghostGeo, ghostMat); ghostCursor.visible = false; scene.add(ghostCursor);
+
+function toggleBuildMode(typeId) {
+    removeMode = false; document.getElementById('btn-remove-scenery').classList.remove('remove-mode');
+    document.querySelectorAll('.build-btn').forEach(b => b.classList.remove('active'));
+    if (placingMode && selectedTowerToBuild === typeId) { 
+        placingMode = false; selectedTowerToBuild = null; ghostCursor.visible = false;
+    } else { 
+        placingMode = true; selectedTowerToBuild = typeId; 
+        document.getElementById('btn-build-' + typeId).classList.add('active'); 
+        selectTower(null); ghostCursor.visible = true;
+    }
+}
+
+function toggleRemoveMode() {
+    placingMode = false; selectedTowerToBuild = null; ghostCursor.visible = false;
+    document.querySelectorAll('.build-btn').forEach(b => b.classList.remove('active'));
+    removeMode = !removeMode;
+    const btn = document.getElementById('btn-remove-scenery');
+    if (removeMode) btn.classList.add('remove-mode'); else btn.classList.remove('remove-mode');
+}
+
+function sellTower() {
+    if (!selectedTower) return;
+    GameState.addMoney(selectedTower.getSellValue()); towers.splice(towers.indexOf(selectedTower), 1);
+    selectedTower.destroy(); selectTower(null);
+}
+
+window.addEventListener('pointermove', (event) => {
+    if (!placingMode || !gameStarted) return;
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1; mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects = raycaster.intersectObjects([groundPlane, ...obstacleMeshes]);
+    if (intersects.length > 0) {
+        let hit = intersects[0]; let pos = hit.point; let snapX = Math.round(pos.x); let snapZ = Math.round(pos.z);
+        let placeY = 0.5;
+
+        if (hit.object.userData && hit.object.userData.isBuilding) {
+            if (hit.face.normal.y > 0.9) placeY = hit.object.userData.roofHeight; else return; 
+        }
+
+        ghostCursor.position.set(snapX, placeY + 0.1, snapZ);
+        let occupied = towers.some(t => Math.abs(t.group.position.x - snapX) < 0.1 && Math.abs(t.group.position.z - snapZ) < 0.1 && Math.abs(t.group.position.y - placeY) < 0.1);
+        let onPath = placeY <= 0.5 && isPointOnPath(snapX, snapZ); 
+        
+        if (occupied || onPath) ghostCursor.material.color.setHex(0xff0000);
+        else ghostCursor.material.color.setHex(0x00ff00);
+    }
+});
+
+window.addEventListener('pointerdown', (event) => {
+    if (!gameStarted || event.target.tagName === 'BUTTON' || event.target.closest('.panel') || event.target.closest('.speed-controls') || event.target.closest('#ability-bar')) return;
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1; mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    if (removeMode) {
+        const intersects = raycaster.intersectObjects(obstacleMeshes);
+        if (intersects.length > 0) {
+            let obj = intersects[0].object;
+            if (GameState.spend(100)) {
+                if (obj.userData.parentGroup) sceneryGroup.remove(obj.userData.parentGroup);
+                else sceneryGroup.remove(obj);
+                obstacleMeshes = obstacleMeshes.filter(m => m !== obj);
+                showFloatingText("BULLDOZED", obj.position, '#ff4444');
+            }
+        }
+        return;
+    }
+
+    if (placingMode && selectedTowerToBuild) {
+        const intersects = raycaster.intersectObjects([groundPlane, ...obstacleMeshes]);
+        if (intersects.length > 0) {
+            let hit = intersects[0]; let pos = hit.point; let snapX = Math.round(pos.x); let snapZ = Math.round(pos.z);
+            let placeY = 0.5;
+
+            if (hit.object.userData && hit.object.userData.isBuilding) {
+                if (hit.face.normal.y > 0.9) placeY = hit.object.userData.roofHeight; else return; 
+            }
+
+            let occupied = towers.some(t => Math.abs(t.group.position.x - snapX) < 0.1 && Math.abs(t.group.position.z - snapZ) < 0.1 && Math.abs(t.group.position.y - placeY) < 0.1);
+            let onPath = placeY <= 0.5 && isPointOnPath(snapX, snapZ); 
+            
+            if (!occupied && !onPath) {
+                const def = TOWER_TYPES[selectedTowerToBuild];
+                if (GameState.spend(def.cost)) {
+                    const newTower = new Tower(snapX, placeY, snapZ, selectedTowerToBuild);
+                    towers.push(newTower); toggleBuildMode(selectedTowerToBuild); selectTower(newTower);
+                }
+            }
+        }
+    } else {
+        const towerHitboxes = towers.map(t => t.hitbox);
+        const intersects = raycaster.intersectObjects(towerHitboxes);
+        if (intersects.length > 0) selectTower(intersects[0].object.userData.tower);
+        else selectTower(null);
+    }
+});
+
+// --- 7. UPGRADE SYSTEM ---
+const UpgradeCosts = [ [200,400,800,1500,4000], [150,300,700,1200,3000], [100,200,400,800,2000] ];
+
+function selectTower(tower) {
+    if (selectedTower) selectedTower.select(false);
+    selectedTower = tower;
+    const panel = document.getElementById('upgrade-panel');
+    if (tower) { tower.select(true); panel.style.display = 'block'; updateUI(); } 
+    else panel.style.display = 'none';
+}
+
+function upgradeSelectedTower(pathIndex) {
+    if (!selectedTower || selectedTower.isParagon) return;
+    const tier = selectedTower.tiers[pathIndex];
+    if (tier >= 5) return;
+    
+    let maxTier = 0; for (let i = 0; i < 3; i++) if (selectedTower.tiers[i] > maxTier) maxTier = selectedTower.tiers[i];
+    if (maxTier >= 3 && tier === 2 && pathIndex !== selectedTower.tiers.indexOf(maxTier)) return;
+
+    const cost = UpgradeCosts[pathIndex][tier];
+    if (GameState.spend(cost)) {
+        selectedTower.totalSpent += cost; selectedTower.tiers[pathIndex]++;
+        if (pathIndex === 0) selectedTower.damage *= 1.5; 
+        if (pathIndex === 1) selectedTower.baseFireRate *= 1.3; selectedTower.fireRate = selectedTower.baseFireRate;
+        if (pathIndex === 2) {
+            selectedTower.range *= 1.25;
+            selectedTower.rangeRing.geometry.dispose();
+            selectedTower.rangeRing.geometry = new THREE.RingGeometry(selectedTower.range - 0.1, selectedTower.range, 32);
+            if(selectedTower.typeId === 'village') selectedTower.aura.scale.setScalar(selectedTower.range);
+        }
+        selectedTower.updateVisuals(); updateUI();
+    }
+}
+
+function ascendToParagon() { if(selectedTower) selectedTower.ascend(); }
+
+function updateUI() {
+    if (!selectedTower) return;
+    document.getElementById('tower-name').innerText = selectedTower.name;
+    document.getElementById('tower-stats').innerText = `DMG: ${Math.round(selectedTower.damage)} | SPD: ${selectedTower.fireRate.toFixed(1)}/s | RNG: ${selectedTower.range.toFixed(1)}`;
+    document.getElementById('btn-sell').innerText = `Sell for $${selectedTower.getSellValue()}`;
+
+    let hasTier5 = false;
+    for(let i=0; i<3; i++) {
+        const tier = selectedTower.tiers[i];
+        if (tier >= 5) hasTier5 = true;
+        document.getElementById(`tier${i+1}-display`).innerText = `${tier}/5`;
+        let locked = tier === 5 || selectedTower.isParagon; 
+        let maxTier = 0; let maxIndex = -1;
+        for (let j=0; j<3; j++) if (selectedTower.tiers[j] > maxTier) { maxTier = selectedTower.tiers[j]; maxIndex = j; }
+        if (maxTier >= 3 && tier === 2 && i !== maxIndex) locked = true;
+        
+        const btn = document.getElementById(`btn-path${i+1}`);
+        if (!locked) { document.getElementById(`cost${i+1}-display`).innerText = UpgradeCosts[i][tier]; btn.disabled = false; btn.style.opacity = 1.0; } 
+        else { document.getElementById(`cost${i+1}-display`).innerText = "MAX/LOCKED"; btn.disabled = true; btn.style.opacity = 0.4; }
+    }
+    
+    const btnParagon = document.getElementById('btn-paragon');
+    if (hasTier5 && !selectedTower.isParagon) { btnParagon.style.display = 'block'; btnParagon.disabled = GameState.money < 15000; } 
+    else btnParagon.style.display = 'none';
+}
+
+function applyVillageBuffs() {
+    towers.forEach(t => { t.buffedSpeed = 1.0; t.buffedCamo = false; });
+    let villages = towers.filter(t => t.typeId === 'village');
+    villages.forEach(v => {
+        const rangeSq = v.range * v.range;
+        towers.forEach(t => { if (t !== v && v.group.position.distanceToSquared(t.group.position) <= rangeSq) { t.buffedSpeed = 1.25; t.buffedCamo = true; } });
+    });
+}
+
+// --- 8. GAME LOOP ---
+const clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate); 
+    if (!gameStarted) { renderer.render(scene, camera); return; }
+
+    const dt = clock.getDelta() * gameSpeed;
+    
+    startPortal.rotation.y += dt * 1.5; endCore.rotation.x += dt * 0.5; endCore.rotation.y += dt * 0.5;
+
+    applyVillageBuffs();
+    WaveManager.update(dt);
+    towers.forEach(t => t.update(dt));
+    updateExplosions(dt); updateCoins(dt); updateGlobalAbilitiesCooldowns();
+    
+    if(selectedTower) { if (selectedTower.tiers.some(t => t >= 5) && !selectedTower.isParagon) document.getElementById('btn-paragon').disabled = GameState.money < 15000; }
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        if (enemies[i].active) enemies[i].update(dt);
+        else enemies.splice(i, 1);
+    }
+    
+    towers.forEach(t => { if(t.radar) t.radar.rotation.y += dt*2; });
+    renderer.render(scene, camera);
+}
+window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+animate();
+</script>
+</body>
+</html>
