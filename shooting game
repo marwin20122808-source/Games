@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Survivor: Bullet Hell Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            overflow: hidden;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            user-select: none;
+        }
+        #lives {
+            font-size: 20px;
+            color: #0ff;
+            text-shadow: 0 0 10px #0ff;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        .warning-text {
+            position: absolute;
+            top: 20%;
+            width: 100%;
+            text-align: center;
+            font-size: 40px;
+            display: none;
+            pointer-events: none;
+            user-select: none;
+            font-weight: bold;
+        }
+        #bossWarning {
+            color: #ff0055;
+            text-shadow: 0 0 20px #ff0055;
+        }
+        #megaBossWarning {
+            color: #9900ff;
+            text-shadow: 0 0 30px #9900ff;
+            font-size: 50px;
+        }
+        #hellBossWarning {
+            color: #ffd700;
+            text-shadow: 0 0 40px #ffd700, 0 0 20px #fff;
+            font-size: 60px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            text-shadow: 0 0 10px #fff;
+        }
+        p {
+            margin: 5px 0 0 0;
+            font-size: 16px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>Score: <span id="scoreEl">0</span></h1>
+        <div id="lives">Lives: ★ ★ ★</div>
+        <p>WASD to move | Mouse to aim & shoot</p>
+    </div>
+    
+    <div id="bossWarning" class="warning-text">WARNING: BOSS APPROACHING</div>
+    <div id="megaBossWarning" class="warning-text">DANGER: MEGA BOSS APPROACHING</div>
+    <div id="hellBossWarning" class="warning-text">EXTREME DANGER: BULLET HELL BOSS</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('scoreEl');
+const livesEl = document.getElementById('lives');
+const bossWarning = document.getElementById('bossWarning');
+const megaBossWarning = document.getElementById('megaBossWarning');
+const hellBossWarning = document.getElementById('hellBossWarning');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let score = 0;
+let animationId;
+let isGameOver = false;
+
+// Game State & Upgrades
+let frames = 0;
+let fireRate = 12;
+let lastFire = 0;
+let secretActive = false;
+let spreadLevel = 0; 
+
+let nextBossScore = 1000;
+let bossActive = false;
+let bossesDefeated = 0;
+let bossesSpawned = 0; // Tracks total bosses to determine which type to spawn
+
+// Input handling
+const keys = { w: false, a: false, s: false, d: false };
+const mouse = { x: canvas.width / 2, y: canvas.height / 2, isDown: false };
+
+window.addEventListener('keydown', (e) => {
+    if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
+    if (e.code === 'Space') triggerSecret();
+});
+window.addEventListener('keyup', (e) => {
+    if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
+});
+window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+window.addEventListener('mousedown', () => mouse.isDown = true);
+window.addEventListener('mouseup', () => mouse.isDown = false);
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+class Player {
+    constructor(x, y, radius, color) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.baseColor = color;
+        this.color = color;
+        this.speed = 5;
+        this.lives = 3;
+        this.isInvincible = false;
+        this.invincibilityTimer = 0;
+    }
+    draw() {
+        ctx.save();
+        if (this.isInvincible && Math.floor(frames / 10) % 2 === 0) {
+            ctx.globalAlpha = 0.3;
+        }
+
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        const angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+        ctx.lineTo(this.x + Math.cos(angle) * 30, this.y + Math.sin(angle) * 30);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.restore();
+    }
+    update() {
+        if (this.isInvincible && frames - this.invincibilityTimer > 120) { 
+            this.isInvincible = false;
+        }
+
+        if (keys.w && this.y - this.radius > 0) this.y -= this.speed;
+        if (keys.s && this.y + this.radius < canvas.height) this.y += this.speed;
+        if (keys.a && this.x - this.radius > 0) this.x -= this.speed;
+        if (keys.d && this.x + this.radius < canvas.width) this.x += this.speed;
+        this.draw();
+    }
+    takeDamage() {
+        if (this.isInvincible) return false;
+        
+        this.lives -= 1;
+        this.updateLivesUI();
+        createExplosion(this.x, this.y, '#fff', 30, 10);
+        
+        if (this.lives <= 0) return true;
+        
+        this.isInvincible = true;
+        this.invincibilityTimer = frames;
+        return false;
+    }
+    addLife() {
+        this.lives += 1;
+        this.updateLivesUI();
+        const origColor = this.color;
+        this.color = '#0f0';
+        setTimeout(() => { this.color = origColor; }, 500);
+    }
+    updateLivesUI() {
+        let stars = '';
+        for (let i = 0; i < this.lives; i++) stars += '★ ';
+        livesEl.innerHTML = `Lives: ${stars}`;
+    }
+}
+
+class Laser {
+    constructor(axis, pos) {
+        this.axis = axis; 
+        this.pos = pos;
+        this.timer = 0;
+        this.warningDuration = 100; // Slightly faster warning to increase difficulty
+        this.activeDuration = 25; 
+        this.thickness = 40;
+    }
+    draw() {
+        ctx.save();
+        if (this.timer < this.warningDuration) {
+            ctx.globalAlpha = Math.abs(Math.sin(this.timer * 0.15)) * 0.5 + 0.1;
+            ctx.fillStyle = '#ff0000';
+            if (this.axis === 'h') ctx.fillRect(0, this.pos - 2, canvas.width, 4);
+            else ctx.fillRect(this.pos - 2, 0, 4, canvas.height);
+        } else if (this.timer < this.warningDuration + this.activeDuration) {
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#ff0000';
+            ctx.fillStyle = '#ffcccc'; 
+            
+            if (this.axis === 'h') {
+                ctx.fillRect(0, this.pos - this.thickness/2, canvas.width, this.thickness);
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(0, this.pos - this.thickness/4, canvas.width, this.thickness/2);
+            } else {
+                ctx.fillRect(this.pos - this.thickness/2, 0, this.thickness, canvas.height);
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(this.pos - this.thickness/4, 0, this.thickness/2, canvas.height);
+            }
+        }
+        ctx.restore();
+    }
+    update() {
+        this.draw();
+        if (this.timer >= this.warningDuration && this.timer < this.warningDuration + this.activeDuration) {
+            let hit = false;
+            if (this.axis === 'h' && Math.abs(player.y - this.pos) < player.radius + this.thickness/2) hit = true;
+            if (this.axis === 'v' && Math.abs(player.x - this.pos) < player.radius + this.thickness/2) hit = true;
+            
+            if (hit && !player.isInvincible) {
+                const isDead = player.takeDamage();
+                if (isDead) gameOver();
+            }
+        }
+        this.timer++;
+    }
+}
+
+class Projectile {
+    constructor(x, y, radius, color, velocity, isEnemy = false) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.color = color;
+        this.velocity = velocity;
+        this.isEnemy = isEnemy;
+    }
+    draw() {
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
+    update() {
+        this.x += this.velocity.x;
+        this.y += this.velocity.y;
+        this.draw();
+    }
+}
+
+class Enemy {
+    constructor(x, y, radius, color, velocity) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.color = color;
+        this.velocity = velocity;
+        this.vertices = Math.floor(Math.random() * 3) + 3; 
+        this.rotation = 0;
+        this.rotSpeed = (Math.random() - 0.5) * 0.1;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        for (let i = 0; i < this.vertices; i++) {
+            const angle = (i * Math.PI * 2) / this.vertices;
+            const px = Math.cos(angle) * this.radius;
+            const py = Math.sin(angle) * this.radius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fill();
+        ctx.restore();
+    }
+    update() {
+        this.rotation += this.rotSpeed;
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        this.velocity.x = Math.cos(angle) * 1.5;
+        this.velocity.y = Math.sin(angle) * 1.5;
+        this.x += this.velocity.x;
+        this.y += this.velocity.y;
+        this.draw();
+    }
+}
+
+class Boss {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 60;
+        this.color = '#ff0055';
+        this.maxHealth = 40;
+        this.health = 40;
+        this.rotation = 0;
+        this.lastShot = 0;
+        this.scoreYield = 500;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = this.color;
+        
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (i * Math.PI * 2) / 6;
+            const px = Math.cos(angle) * this.radius;
+            const py = Math.sin(angle) * this.radius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 0, 85, 0.2)';
+        ctx.fill();
+        ctx.restore();
+
+        ctx.fillStyle = '#333';
+        ctx.fillRect(this.x - 50, this.y - this.radius - 20, 100, 10);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - 50, this.y - this.radius - 20, (this.health / this.maxHealth) * 100, 10);
+    }
+    update() {
+        this.rotation += 0.02;
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        this.x += Math.cos(angle) * 0.8;
+        this.y += Math.sin(angle) * 0.8;
+
+        if (frames - this.lastShot > 60) {
+            for (let i = -1; i <= 1; i++) {
+                const spreadAngle = angle + (i * 0.3);
+                const velocity = { x: Math.cos(spreadAngle) * 5, y: Math.sin(spreadAngle) * 5 };
+                projectiles.push(new Projectile(this.x, this.y, 8, this.color, velocity, true));
+            }
+            this.lastShot = frames;
+        }
+        this.draw();
+    }
+}
+
+class MegaBoss {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 90;
+        this.color = '#9900ff';
+        this.maxHealth = 120;
+        this.health = 120;
+        this.rotation = 0;
+        this.lastShot = 0;
+        this.scoreYield = 1500;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.shadowBlur = 40;
+        ctx.shadowColor = this.color;
+        
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+            const angle = (i * Math.PI * 2) / 8;
+            const px = Math.cos(angle) * this.radius;
+            const py = Math.sin(angle) * this.radius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(153, 0, 255, 0.2)';
+        ctx.fill();
+        ctx.restore();
+
+        ctx.fillStyle = '#333';
+        ctx.fillRect(this.x - 70, this.y - this.radius - 20, 140, 12);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - 70, this.y - this.radius - 20, (this.health / this.maxHealth) * 140, 12);
+    }
+    update() {
+        this.rotation += 0.01; 
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        this.x += Math.cos(angle) * 0.4; 
+        this.y += Math.sin(angle) * 0.4;
+
+        if (frames - this.lastShot > 90) {
+            for (let i = 0; i < Math.PI * 2; i += Math.PI / 4) {
+                const velocity = { x: Math.cos(i) * 6, y: Math.sin(i) * 6 };
+                projectiles.push(new Projectile(this.x, this.y, 10, this.color, velocity, true));
+            }
+            this.lastShot = frames;
+        }
+        this.draw();
+    }
+}
+
+class HellBoss {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 100;
+        this.color = '#ffd700'; // Gold
+        this.maxHealth = 250;
+        this.health = 250;
+        this.rotation = 0;
+        this.scoreYield = 3000;
+        this.spiralAngle = 0;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.shadowBlur = 50;
+        ctx.shadowColor = this.color;
+        
+        // Draw a 10-point star shape
+        ctx.beginPath();
+        for (let i = 0; i < 20; i++) {
+            const angle = (i * Math.PI * 2) / 20;
+            const r = i % 2 === 0 ? this.radius : this.radius / 1.5;
+            const px = Math.cos(angle) * r;
+            const py = Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+        ctx.fill();
+        ctx.restore();
+
+        // Health Bar
+        ctx.fillStyle = '#333';
+        ctx.fillRect(this.x - 80, this.y - this.radius - 20, 160, 12);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - 80, this.y - this.radius - 20, (this.health / this.maxHealth) * 160, 12);
+    }
+    update() {
+        this.rotation += 0.02;
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        
+        // Moves very slowly to allow dodging
+        this.x += Math.cos(angle) * 0.2; 
+        this.y += Math.sin(angle) * 0.2;
+
+        // BULLET HELL MECHANICS
+        
+        // 1. Constant double spiral 
+        if (frames % 6 === 0) {
+            this.spiralAngle += 0.35;
+            const v1 = { x: Math.cos(this.spiralAngle) * 5, y: Math.sin(this.spiralAngle) * 5 };
+            const v2 = { x: Math.cos(this.spiralAngle + Math.PI) * 5, y: Math.sin(this.spiralAngle + Math.PI) * 5 };
+            projectiles.push(new Projectile(this.x, this.y, 7, this.color, v1, true));
+            projectiles.push(new Projectile(this.x, this.y, 7, this.color, v2, true));
+        }
+
+        // 2. Massive Ring Burst every ~2.5 seconds
+        if (frames % 150 === 0) {
+            for (let i = 0; i < Math.PI * 2; i += Math.PI / 8) { // 16 bullets
+                const velocity = { x: Math.cos(i) * 7, y: Math.sin(i) * 7 };
+                projectiles.push(new Projectile(this.x, this.y, 10, '#ffffff', velocity, true));
+            }
+        }
+
+        this.draw();
+    }
+}
+
+
+class PowerUp {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = 15;
+        this.type = Math.floor(Math.random() * 3);
+        
+        if (this.type === 0) { this.color = '#ffea00'; this.text = 'SPREAD'; }
+        else if (this.type === 1) { this.color = '#ff6600'; this.text = 'RAPID'; }
+        else { this.color = '#00ff33'; this.text = 'SPEED'; }
+    }
+    draw() {
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+        
+        const pulse = Math.sin(frames * 0.1) * 3;
+        ctx.fillRect(this.x - (this.size + pulse)/2, this.y - (this.size + pulse)/2, this.size + pulse, this.size + pulse);
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.text, this.x, this.y - 15);
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, radius, color, velocity) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.color = color;
+        this.velocity = velocity;
+        this.alpha = 1;
+    }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
+    update() {
+        this.velocity.x *= 0.98;
+        this.velocity.y *= 0.98;
+        this.x += this.velocity.x;
+        this.y += this.velocity.y;
+        this.alpha -= 0.02;
+        this.draw();
+    }
+}
+
+const player = new Player(canvas.width / 2, canvas.height / 2, 15, '#0ff');
+let projectiles = [];
+let enemies = [];
+let particles = [];
+let powerups = [];
+let bosses = [];
+let lasers = [];
+
+function spawnEnemies() {
+    if (bossActive) return;
+
+    if (frames % 60 === 0) {
+        const radius = Math.random() * 20 + 10;
+        let x, y;
+        if (Math.random() < 0.5) {
+            x = Math.random() < 0.5 ? 0 - radius : canvas.width + radius;
+            y = Math.random() * canvas.height;
+        } else {
+            x = Math.random() * canvas.width;
+            y = Math.random() < 0.5 ? 0 - radius : canvas.height + radius;
+        }
+        const color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        enemies.push(new Enemy(x, y, radius, color, { x: 0, y: 0 }));
+    }
+}
+
+function spawnWallLasers() {
+    // Laser interval shrinks as score goes up, caps at every 80 frames
+    let laserInterval = Math.max(80, 250 - Math.floor(score / 50));
+    
+    if (score > 500 && frames % laserInterval === 0) {
+        // Spawn more lasers at once as score climbs (Max 4 at a time)
+        let laserCount = Math.min(4, 1 + Math.floor(score / 3000));
+        
+        for (let i = 0; i < laserCount; i++) {
+            const axis = Math.random() < 0.5 ? 'h' : 'v';
+            let pos;
+            
+            // The first laser always tracks near the player, others are scattered
+            if (i === 0) {
+                pos = axis === 'h' ? player.y : player.x;
+            } else {
+                pos = (axis === 'h' ? player.y : player.x) + (Math.random() - 0.5) * 600;
+            }
+            
+            lasers.push(new Laser(axis, pos));
+        }
+    }
+}
+
+function spawnBoss(type) {
+    bossActive = true;
+    
+    if (type === 'hell') {
+        hellBossWarning.style.display = 'block';
+        setTimeout(() => { hellBossWarning.style.display = 'none'; }, 4000);
+        bosses.push(new HellBoss(canvas.width / 2, -150));
+    } else if (type === 'mega') {
+        megaBossWarning.style.display = 'block';
+        setTimeout(() => { megaBossWarning.style.display = 'none'; }, 4000);
+        bosses.push(new MegaBoss(canvas.width / 2, -150));
+    } else {
+        bossWarning.style.display = 'block';
+        setTimeout(() => { bossWarning.style.display = 'none'; }, 3000);
+        bosses.push(new Boss(canvas.width / 2, -100));
+    }
+}
+
+function createExplosion(x, y, color, amount, power) {
+    for (let i = 0; i < amount; i++) {
+        particles.push(new Particle(x, y, Math.random() * 3 + 1, color, {
+            x: (Math.random() - 0.5) * (Math.random() * power),
+            y: (Math.random() - 0.5) * (Math.random() * power)
+        }));
+    }
+}
+
+function triggerSecret() {
+    if (secretActive) return;
+    secretActive = true;
+    createExplosion(player.x, player.y, '#fff', 150, 40);
+    
+    enemies.forEach(enemy => {
+        createExplosion(enemy.x, enemy.y, enemy.color, 20, 10);
+        score += 50;
+    });
+    enemies = [];
+    
+    bosses.forEach(boss => {
+        boss.health -= 20; 
+        createExplosion(boss.x, boss.y, boss.color, 50, 20);
+    });
+    
+    scoreEl.innerHTML = score;
+    
+    const originalColor = player.color;
+    player.color = '#fff';
+    setTimeout(() => {
+        player.color = originalColor;
+        secretActive = false;
+    }, 500);
+}
+
+function gameOver() {
+    cancelAnimationFrame(animationId);
+    createExplosion(player.x, player.y, player.baseColor, 50, 15);
+    livesEl.innerHTML = "Lives: 0";
+    document.querySelector('#ui h1').innerHTML = `Game Over! Final Score: ${score} <br><span style="font-size:16px;cursor:pointer;color:#0ff" onclick="location.reload()">Click here to restart</span>`;
+}
+
+function animate() {
+    animationId = requestAnimationFrame(animate);
+    
+    ctx.fillStyle = 'rgba(5, 5, 5, 0.2)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    player.update();
+    
+    if (score >= nextBossScore) {
+        bossesSpawned++;
+        
+        if (bossesSpawned % 5 === 0) {
+            spawnBoss('hell'); // Spawn Gold Bullet Hell boss every 5th boss
+        } else if (bossesSpawned % 3 === 0) {
+            spawnBoss('mega'); // Spawn Purple Mega Boss every 3rd boss
+        } else {
+            spawnBoss('normal');
+        }
+        
+        nextBossScore += 1000;
+    }
+    
+    if (mouse.isDown && frames - lastFire > fireRate) {
+        const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        
+        for (let i = -spreadLevel; i <= spreadLevel; i++) {
+            const spreadAngle = angle + (i * 0.15); 
+            const velocity = { x: Math.cos(spreadAngle) * 12, y: Math.sin(spreadAngle) * 12 };
+            projectiles.push(new Projectile(player.x, player.y, 5, player.color, velocity));
+        }
+        lastFire = frames;
+    }
+
+    lasers.forEach((laser, index) => {
+        laser.update();
+        if (laser.timer > laser.warningDuration + laser.activeDuration) {
+            lasers.splice(index, 1);
+        }
+    });
+
+    powerups.forEach((pu, index) => {
+        pu.draw();
+        const dist = Math.hypot(player.x - pu.x, player.y - pu.y);
+        if (dist < player.radius + pu.size) {
+            if (pu.type === 0) spreadLevel = Math.min(7, spreadLevel + 1); 
+            if (pu.type === 1) fireRate = Math.max(4, fireRate - 4);
+            if (pu.type === 2) player.speed = Math.min(10, player.speed + 2);
+            powerups.splice(index, 1);
+        }
+    });
+
+    particles.forEach((particle, index) => {
+        if (particle.alpha <= 0) particles.splice(index, 1);
+        else particle.update();
+    });
+
+    projectiles.forEach((projectile, pIndex) => {
+        projectile.update();
+        
+        if (projectile.x + projectile.radius < 0 || projectile.x - projectile.radius > canvas.width || 
+            projectile.y + projectile.radius < 0 || projectile.y - projectile.radius > canvas.height) {
+            projectiles.splice(pIndex, 1);
+            return;
+        }
+        
+        if (projectile.isEnemy) {
+            const dist = Math.hypot(projectile.x - player.x, projectile.y - player.y);
+            if (dist - projectile.radius - player.radius < 0) {
+                projectiles.splice(pIndex, 1); 
+                const isDead = player.takeDamage();
+                if (isDead) gameOver();
+            }
+        }
+    });
+
+    bosses.forEach((boss, bIndex) => {
+        boss.update();
+        
+        const distToPlayer = Math.hypot(player.x - boss.x, player.y - boss.y);
+        if (distToPlayer - boss.radius - player.radius < 0) {
+            const isDead = player.takeDamage();
+            if (isDead) gameOver();
+        }
+
+        projectiles.forEach((projectile, pIndex) => {
+            if (projectile.isEnemy) return; 
+            
+            const dist = Math.hypot(projectile.x - boss.x, projectile.y - boss.y);
+            if (dist - boss.radius - projectile.radius < 0) {
+                boss.health -= 1;
+                createExplosion(projectile.x, projectile.y, '#fff', 5, 5);
+                projectiles.splice(pIndex, 1);
+                
+                if (boss.health <= 0) {
+                    createExplosion(boss.x, boss.y, boss.color, 250, 40);
+                    score += boss.scoreYield;
+                    scoreEl.innerHTML = score;
+                    bosses.splice(bIndex, 1);
+                    bossActive = false;
+                    
+                    // Bosses drop 2 powerups now to help survive the chaos
+                    powerups.push(new PowerUp(boss.x - 20, boss.y));
+                    powerups.push(new PowerUp(boss.x + 20, boss.y));
+                    
+                    bossesDefeated++;
+                    if (bossesDefeated % 3 === 0) {
+                        player.addLife();
+                    }
+                }
+            }
+        });
+    });
+
+    enemies.forEach((enemy, eIndex) => {
+        enemy.update();
+        
+        const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+        if (distToPlayer - enemy.radius - player.radius < 0) {
+            const isDead = player.takeDamage();
+            if (isDead) {
+                gameOver();
+            } else {
+                createExplosion(enemy.x, enemy.y, enemy.color, enemy.radius, 10);
+                enemies.splice(eIndex, 1);
+            }
+        }
+
+        projectiles.forEach((projectile, pIndex) => {
+            if (projectile.isEnemy) return;
+
+            const dist = Math.hypot(projectile.x - enemy.x, projectile.y - enemy.y);
+            if (dist - enemy.radius - projectile.radius < 0) {
+                createExplosion(enemy.x, enemy.y, enemy.color, enemy.radius, 10);
+                
+                if (enemy.radius > 15) {
+                    enemy.radius -= 5;
+                } else {
+                    if (Math.random() < 0.15) {
+                        powerups.push(new PowerUp(enemy.x, enemy.y));
+                    }
+                    enemies.splice(eIndex, 1);
+                    score += 100;
+                    scoreEl.innerHTML = score;
+                }
+                projectiles.splice(pIndex, 1);
+            }
+        });
+    });
+
+    spawnEnemies();
+    spawnWallLasers();
+    frames++;
+}
+
+animate();
+</script>
+</body>
+</html>
