@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Ball Mind Reader</title>
+    <style>
+        body {
+            background-color: #1a002a;
+            color: #ffd700;
+            font-family: 'Georgia', serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 2.5em;
+            text-shadow: 2px 2px 5px #000;
+            margin-bottom: 5px;
+        }
+        .instructions {
+            max-width: 600px;
+            margin: 0 auto 20px auto;
+            font-size: 1.1em;
+            line-height: 1.6;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4b0082;
+        }
+        #grid-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            height: 350px;
+            overflow-y: auto;
+            box-shadow: inset 0 0 20px #000;
+        }
+        .grid-item {
+            width: 12%;
+            margin: 5px;
+            font-size: 1.4em;
+        }
+        #crystal-ball {
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle at 30% 30%, #9400d3, #2a004d, #000);
+            border: 4px solid #ffd700;
+            border-radius: 50%;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5em;
+            cursor: pointer;
+            box-shadow: 0 0 25px #9400d3;
+            transition: all 0.4s ease;
+            user-select: none;
+        }
+        #crystal-ball:hover {
+            box-shadow: 0 0 40px #ffd700;
+            transform: scale(1.05);
+        }
+        #crystal-ball.revealed {
+            background: radial-gradient(circle at 50% 50%, #fff, #ffd700, #ff8c00);
+            box-shadow: 0 0 60px #fff;
+            color: #000;
+            cursor: default;
+        }
+        .hidden { display: none; }
+        button {
+            background-color: #ffd700;
+            color: #1a002a;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 15px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #fffacd;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🔮 The Crystal Ball 🔮</h1>
+
+    <div class="instructions">
+        <p>1. Think of any two-digit number (e.g., 42).</p>
+        <p>2. Subtract both of its digits from it (e.g., 42 - 4 - 2 = 36).</p>
+        <p>3. Find your new number in the chart below and remember the symbol next to it.</p>
+        <p>4. Concentrate on your symbol, then click the Crystal Ball to reveal it!</p>
+    </div>
+
+    <div id="grid-container"></div>
+
+    <div id="crystal-ball" title="Click to reveal your symbol!">❓</div>
+    
+    <button id="reset-btn" class="hidden">Consult the Spirits Again</button>
+
+    <script>
+        // A collection of mystical symbols
+        const symbols = ['✧', '★', '❆', '❂', '✺', '❈', '⎈', '♔', '♕', '♖', '♗', '♘', '♙', '☾', '☀', '☁', '☂', '☃', '☄', '☯', '☸', '☥', '☮'];
+        let magicSymbol = '';
+
+        function initGame() {
+            const gridContainer = document.getElementById('grid-container');
+            const crystalBall = document.getElementById('crystal-ball');
+            const resetBtn = document.getElementById('reset-btn');
+            
+            // Reset UI
+            gridContainer.innerHTML = '';
+            crystalBall.innerHTML = '❓';
+            crystalBall.classList.remove('revealed');
+            resetBtn.classList.add('hidden');
+            
+            // Pick the target symbol that will appear on all multiples of 9
+            magicSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+            
+            let html = '';
+            // Generate numbers from 99 down to 0
+            for (let i = 99; i >= 0; i--) {
+                let currentSymbol = '';
+                
+                // The math trick: Every valid result will always be a multiple of 9
+                if (i % 9 === 0) {
+                    currentSymbol = magicSymbol;
+                } else {
+                    // Pick a random symbol for the other numbers
+                    currentSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+                }
+                html += `<div class="grid-item"><b>${i}</b> &nbsp; ${currentSymbol}</div>`;
+            }
+            gridContainer.innerHTML = html;
+
+            crystalBall.onclick = revealSymbol;
+        }
+
+        function revealSymbol() {
+            const crystalBall = document.getElementById('crystal-ball');
+            const resetBtn = document.getElementById('reset-btn');
+            
+            crystalBall.innerHTML = magicSymbol;
+            crystalBall.classList.add('revealed');
+            
+            // Show the reset button shortly after the reveal
+            setTimeout(() => {
+                resetBtn.classList.remove('hidden');
+            }, 800);
+            
+            crystalBall.onclick = null; // Disable clicking again until reset
+        }
+
+        document.getElementById('reset-btn').addEventListener('click', initGame);
+
+        // Start the game on page load
+        window.onload = initGame;
+    </script>
+</body>
+</html>
